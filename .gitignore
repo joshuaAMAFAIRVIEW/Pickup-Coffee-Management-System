@@ -1,0 +1,22 @@
+# Ignore vendor folder (if using Composer)
+vendor/
+
+# Ignore config files with sensitive data
+smtp_config.php
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore uploaded files
+uploads/
+assets/img/uploads/
+
+# Ignore logs
+*.log
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo

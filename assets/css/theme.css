@@ -1,0 +1,98 @@
+/* Theme styles for Pickup Coffee */
+:root{
+  /* Brand colors provided by the user */
+  --theme-color: #A9C27F; /* main green */
+  --pickup-white: #FFFFFF;
+  --pickup-grey: #454545; /* sidebar background */
+  --sidebar-bg: var(--pickup-grey);
+  /* Sidebar text should be white for contrast */
+  --sidebar-text: var(--pickup-white);
+}
+
+/* Global font will be loaded via Google Fonts link in the page head */
+html, body { box-sizing: border-box; margin: 0; padding: 0; overflow-x: hidden; }
+*, *:before, *:after { box-sizing: inherit; }
+body { font-family: 'Jost', sans-serif; }
+
+#sidebar-wrapper { background: var(--theme-color); color: var(--sidebar-text); }
+#sidebar-wrapper .sidebar-heading { color: var(--sidebar-text); }
+#sidebar-wrapper .company-logo-placeholder { background: transparent; color: var(--sidebar-text); }
+#sidebar-wrapper .list-group-item { background: transparent; color: var(--sidebar-text) !important; border: none; font-weight:600; opacity: 1; }
+/* Slight translucent white highlight on hover so items remain visible on green */
+#sidebar-wrapper .list-group-item:hover { background: rgba(255,255,255,0.06); }
+/* Active link: use a darker tint of the theme color to indicate selection */
+#sidebar-wrapper .list-group-item.active { background: #8fb06a; color: var(--pickup-white); }
+
+/* Make sidebar links easier to read (icons/text) */
+#sidebar-wrapper .list-group-item .bi, #sidebar-wrapper .list-group-item i { color: var(--sidebar-text); }
+
+/* Buttons and accents */
+.btn-primary { background: var(--theme-color); border-color: var(--theme-color); color: var(--pickup-white); }
+.btn-primary:hover { background: #8fb06a; border-color:#8fb06a; }
+
+/* Login specific tweaks */
+.login-card { max-width: 420px; border-radius: 12px; }
+.login-card .card-title { font-weight: 600; }
+
+.company-logo-placeholder img{ max-height:40px; }
+
+/* Use the brand white for headings on the sidebar */
+#sidebar-wrapper .sidebar-heading .fw-bold { color: var(--pickup-white); }
+
+/* Cards and panels: use subtle borders and white backgrounds */
+.card, .card-body { background: var(--pickup-white); }
+
+/* Make the sidebar fixed to the left so page content doesn't drop below it */
+/* Sidebar takes 20% of the viewport width on desktop */
+#sidebar-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  /* Fixed to 15% of the viewport as requested */
+  width: 15%;
+  min-width: 160px; /* avoid too-small sidebar on narrow windows */
+  max-width: 320px;
+  padding-top: 20px;
+  overflow-y: auto;
+}
+
+/* Small transition for subtle polish when resizing the window */
+#sidebar-wrapper, #page-content-wrapper { transition: width 200ms ease, margin-left 200ms ease; }
+
+/* Page content should leave space for the fixed sidebar (80% remaining) */
+/* Content area uses remaining width and avoids causing horizontal overflow */
+#page-content-wrapper {
+  margin-left: 15%;
+  width: calc(100% - 15%);
+  min-height: 100vh;
+  padding: 24px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Ensure content and navbar appear above the sidebar (no overlap) */
+#page-content-wrapper { position: relative; z-index: 20; }
+#sidebar-wrapper { z-index: 10; }
+
+/* Make the top navbar sticky inside the content area so signed-in stays visible */
+#page-content-wrapper .navbar { position: sticky; top: 0; z-index: 30; }
+
+@media (max-width: 992px) {
+  /* On smaller screens switch to stacked layout */
+  #sidebar-wrapper { position: relative; width: 100%; transform: none; min-width: unset; }
+  #page-content-wrapper { margin-left: 0; width: 100%; padding: 16px; }
+}
+
+@media (max-width: 576px) {
+  /* Mobile: sidebar stacks above content */
+  #sidebar-wrapper { position: relative; width: 100%; }
+  #page-content-wrapper { margin-left: 0; padding: 12px; }
+}
+
+/* Ensure modals and their backdrops appear above fixed sidebar and content
+   in case some layouts set aggressive z-indexes. Bootstrap uses large z-index
+   values by default, but enforce higher values here to prevent input blocking. */
+.modal-backdrop { z-index: 2000 !important; }
+.modal { z-index: 2001 !important; pointer-events: auto !important; }
+.modal .modal-dialog { z-index: 2002; }
