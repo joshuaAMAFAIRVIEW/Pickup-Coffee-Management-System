@@ -25,13 +25,30 @@
       const currentPage = window.location.pathname.split('/').pop();
       const inventoryPages = ['inventory.php', 'add_item.php', 'categories.php'];
       
-      // Auto-expand Inventory submenu if on any inventory page
+      // Auto-expand Inventory submenu if on any inventory page WITHOUT animation
       if (inventoryPages.includes(currentPage)) {
         const inventorySub = document.getElementById('inventorySub');
         if (inventorySub) {
-          const bsCollapse = new bootstrap.Collapse(inventorySub, { toggle: false });
-          bsCollapse.show();
+          inventorySub.classList.add('show');
         }
+      }
+      
+      // Store submenu state in sessionStorage
+      const inventoryToggle = document.querySelector('[data-bs-toggle="collapse"][href="#inventorySub"]');
+      const inventorySub = document.getElementById('inventorySub');
+      
+      // Restore submenu state from sessionStorage
+      if (sessionStorage.getItem('inventorySubOpen') === 'true') {
+        inventorySub.classList.add('show');
+      }
+      
+      // Save state when submenu is toggled
+      if (inventoryToggle) {
+        inventoryToggle.addEventListener('click', function() {
+          setTimeout(() => {
+            sessionStorage.setItem('inventorySubOpen', inventorySub.classList.contains('show'));
+          }, 350);
+        });
       }
       
       // Close other submenus when clicking main nav items (except Inventory parent)
@@ -40,11 +57,12 @@
         item.addEventListener('click', function(e) {
           // Don't close if clicking a sub-item
           if (!item.classList.contains('ps-4')) {
-            // Close all collapse submenus
+            // Close all collapse submenus and clear sessionStorage
             document.querySelectorAll('.collapse.show').forEach(function(collapse) {
               const bsCollapse = bootstrap.Collapse.getInstance(collapse);
               if (bsCollapse) bsCollapse.hide();
             });
+            sessionStorage.removeItem('inventorySubOpen');
           }
         });
       });

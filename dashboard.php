@@ -35,16 +35,30 @@ try {
   $hasRegionColumn = (bool)$regionCheck->fetchColumn();
   
   $regionData = [];
+  $selectedRegion = $_GET['region'] ?? '';
   if ($hasItemsTable && $hasRegionColumn) {
-    $stmt = $pdo->query("
-      SELECT u.region, COUNT(i.id) as count
-      FROM items i
-      INNER JOIN users u ON i.assigned_user_id = u.id
-      WHERE u.region IS NOT NULL AND u.region != ''
-      GROUP BY u.region
-      ORDER BY count DESC
-    ");
-    $regionData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($selectedRegion && $selectedRegion !== '') {
+      $stmt = $pdo->prepare("
+        SELECT u.region, COUNT(i.id) as count
+        FROM items i
+        INNER JOIN users u ON i.assigned_user_id = u.id
+        WHERE u.region = :region
+        GROUP BY u.region
+        ORDER BY u.region
+      ");
+      $stmt->execute([':region' => $selectedRegion]);
+      $regionData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+      $stmt = $pdo->query("
+        SELECT u.region, COUNT(i.id) as count
+        FROM items i
+        INNER JOIN users u ON i.assigned_user_id = u.id
+        WHERE u.region IS NOT NULL AND u.region != ''
+        GROUP BY u.region
+        ORDER BY u.region
+      ");
+      $regionData = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
   }
   
 } catch (Exception $e) {
@@ -153,8 +167,34 @@ $regionCounts = array_column($regionData, 'count');
     <div class="col-lg-8">
       <div class="card border-0 shadow-sm">
         <div class="card-header bg-white">
-          <h5 class="mb-0">Borrowed Items by Region</h5>
-          <small class="text-muted">Distribution of borrowed equipment across Philippine regions</small>
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h5 class="mb-0">Borrowed Items by Region</h5>
+              <small class="text-muted">Distribution of borrowed equipment across Philippine regions</small>
+            </div>
+            <div>
+              <select class="form-select form-select-sm" style="min-width: 200px;" onchange="window.location.href='dashboard.php?region='+this.value">
+                <option value="" <?php echo $selectedRegion === '' ? 'selected' : ''; ?>>All Regions</option>
+                <option value="NCR" <?php echo $selectedRegion === 'NCR' ? 'selected' : ''; ?>>NCR</option>
+                <option value="CAR" <?php echo $selectedRegion === 'CAR' ? 'selected' : ''; ?>>CAR</option>
+                <option value="Region I" <?php echo $selectedRegion === 'Region I' ? 'selected' : ''; ?>>Region I</option>
+                <option value="Region II" <?php echo $selectedRegion === 'Region II' ? 'selected' : ''; ?>>Region II</option>
+                <option value="Region III" <?php echo $selectedRegion === 'Region III' ? 'selected' : ''; ?>>Region III</option>
+                <option value="Region IV-A" <?php echo $selectedRegion === 'Region IV-A' ? 'selected' : ''; ?>>Region IV-A</option>
+                <option value="Region IV-B" <?php echo $selectedRegion === 'Region IV-B' ? 'selected' : ''; ?>>Region IV-B</option>
+                <option value="Region V" <?php echo $selectedRegion === 'Region V' ? 'selected' : ''; ?>>Region V</option>
+                <option value="Region VI" <?php echo $selectedRegion === 'Region VI' ? 'selected' : ''; ?>>Region VI</option>
+                <option value="Region VII" <?php echo $selectedRegion === 'Region VII' ? 'selected' : ''; ?>>Region VII</option>
+                <option value="Region VIII" <?php echo $selectedRegion === 'Region VIII' ? 'selected' : ''; ?>>Region VIII</option>
+                <option value="Region IX" <?php echo $selectedRegion === 'Region IX' ? 'selected' : ''; ?>>Region IX</option>
+                <option value="Region X" <?php echo $selectedRegion === 'Region X' ? 'selected' : ''; ?>>Region X</option>
+                <option value="Region XI" <?php echo $selectedRegion === 'Region XI' ? 'selected' : ''; ?>>Region XI</option>
+                <option value="Region XII" <?php echo $selectedRegion === 'Region XII' ? 'selected' : ''; ?>>Region XII</option>
+                <option value="Region XIII" <?php echo $selectedRegion === 'Region XIII' ? 'selected' : ''; ?>>Region XIII</option>
+                <option value="BARMM" <?php echo $selectedRegion === 'BARMM' ? 'selected' : ''; ?>>BARMM</option>
+              </select>
+            </div>
+          </div>
         </div>
         <div class="card-body">
           <?php if (empty($regionData)): ?>
@@ -232,7 +272,7 @@ $regionCounts = array_column($regionData, 'count');
   ];
   
   new Chart(ctx, {
-    type: 'doughnut',
+    type: 'pie',
     data: {
       labels: <?php echo json_encode($regionLabels); ?>,
       datasets: [{
@@ -273,8 +313,7 @@ $regionCounts = array_column($regionData, 'count');
             }
           }
         }
-      },
-      cutout: '60%'
+      }
     }
   });
 </script>
