@@ -1,27 +1,78 @@
 <?php
 require_once __DIR__ . '/helpers.php';
-require_role(['admin']);
+require_role(['admin', 'area_manager']);
 require_once __DIR__ . '/config.php';
+
+$current_user = $_SESSION['user'];
+$is_admin = $current_user['role'] === 'admin';
+$is_area_manager = $current_user['role'] === 'area_manager';
+
+// Get current user's area if they're an area manager
+$user_area_id = null;
+if ($is_area_manager) {
+    $stmt = $pdo->prepare('SELECT area_id FROM users WHERE id = ?');
+    $stmt->execute([$current_user['id']]);
+    $user_data = $stmt->fetch();
+    $user_area_id = $user_data['area_id'] ?? null;
+}
 
 // Get search parameter
 $search = trim($_GET['search'] ?? '');
 
-// Build query with search
+// Build query with search (include area and store info)
 if ($search !== '') {
-    $stmt = $pdo->prepare('SELECT id, username, employee_number, role, created_at, first_name, last_name, department 
-                           FROM users 
-                           WHERE username LIKE :search 
-                              OR employee_number LIKE :search 
-                              OR first_name LIKE :search 
-                              OR last_name LIKE :search
-                           ORDER BY created_at DESC');
-    $stmt->execute([':search' => '%' . $search . '%']);
+    $stmt = $pdo->prepare('SELECT u.id, u.username, u.employee_number, u.role, u.created_at, u.first_name, u.last_name, u.department,
+                           a.area_name, s.store_name, s.store_code
+                           FROM users u
+                           LEFT JOIN areas a ON u.area_id = a.area_id
+                           LEFT JOIN stores s ON u.store_id = s.store_id
+                           WHERE (u.username LIKE :search 
+                              OR u.employee_number LIKE :search 
+                              OR u.first_name LIKE :search 
+                              OR u.last_name LIKE :search)
+                           ' . ($is_area_manager && $user_area_id ? ' AND (u.store_id IN (SELECT store_id FROM stores WHERE area_id = :area_id) OR u.id = :user_id)' : '') . '
+                           ORDER BY u.created_at DESC');
+    $params = [':search' => '%' . $search . '%'];
+    if ($is_area_manager && $user_area_id) {
+        $params[':area_id'] = $user_area_id;
+        $params[':user_id'] = $current_user['id'];
+    }
+    $stmt->execute($params);
 } else {
-    $stmt = $pdo->query('SELECT id, username, employee_number, role, created_at, first_name, last_name, department FROM users ORDER BY created_at DESC');
+    $query = 'SELECT u.id, u.username, u.employee_number, u.role, u.created_at, u.first_name, u.last_name, u.department,
+                         a.area_name, s.store_name, s.store_code
+                         FROM users u
+                         LEFT JOIN areas a ON u.area_id = a.area_id
+                         LEFT JOIN stores s ON u.store_id = s.store_id';
+    
+    if ($is_area_manager && $user_area_id) {
+        $query .= ' WHERE (u.store_id IN (SELECT store_id FROM stores WHERE area_id = ?) OR u.id = ?)';
+        $stmt = $pdo->prepare($query . ' ORDER BY u.created_at DESC');
+        $stmt->execute([$user_area_id, $current_user['id']]);
+    } else {
+        $stmt = $pdo->query($query . ' ORDER BY u.created_at DESC');
+    }
 }
 $users = $stmt->fetchAll();
 ?>
 <?php include __DIR__ . '/dashboard_nav_wrapper_start.php'; ?>
+
+  <style>
+    /* Fix modal z-index layering - return modal should appear above user detail modal */
+    #userDetailModal {
+      z-index: 1050;
+    }
+    #userDetailModal + .modal-backdrop {
+      z-index: 1049;
+    }
+    #returnEquipmentModal {
+      z-index: 1100 !important;
+    }
+    #returnEquipmentModal + .modal-backdrop,
+    .modal-backdrop:last-of-type {
+      z-index: 1099 !important;
+    }
+  </style>
 
   <?php if (isset($_SESSION['success_message']) || isset($_SESSION['flash_success'])): ?>
     <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -38,8 +89,10 @@ $users = $stmt->fetchAll();
   <?php endif; ?>
 
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h4">Users</h1>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">Add User</button>
+    <h1 class="h4"><?php echo $is_area_manager ? 'My Team - Store Supervisors' : 'Users'; ?></h1>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+      <?php echo $is_area_manager ? 'Add Store Supervisor' : 'Add User'; ?>
+    </button>
   </div>
 
   <!-- Search Bar -->
@@ -78,13 +131,14 @@ $users = $stmt->fetchAll();
               <th>Name</th>
               <th>Department</th>
               <th>Role</th>
+              <th>Area/Store</th>
               <th>Created</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <?php if (!$users): ?>
-              <tr><td colspan="8" class="text-muted">No users found.</td></tr>
+              <tr><td colspan="9" class="text-muted">No users found.</td></tr>
             <?php endif; ?>
             <?php foreach ($users as $u): ?>
               <?php 
@@ -111,6 +165,17 @@ $users = $stmt->fetchAll();
                 <td><?php echo htmlspecialchars($fullName); ?></td>
                 <td><?php echo htmlspecialchars($u['department'] ?? '-'); ?></td>
                 <td><span class="badge bg-primary"><?php echo htmlspecialchars($u['role']); ?></span></td>
+                <td>
+                  <?php if ($u['area_name']): ?>
+                    <span class="badge bg-info text-dark"><i class="fas fa-map-marked-alt"></i> <?php echo htmlspecialchars($u['area_name']); ?></span>
+                  <?php endif; ?>
+                  <?php if ($u['store_name']): ?>
+                    <span class="badge bg-success"><i class="fas fa-store"></i> <?php echo htmlspecialchars($u['store_name']); ?></span>
+                  <?php endif; ?>
+                  <?php if (!$u['area_name'] && !$u['store_name']): ?>
+                    <span class="text-muted">-</span>
+                  <?php endif; ?>
+                </td>
                 <td><small class="text-muted"><?php echo date('M d, Y', strtotime($u['created_at'])); ?></small></td>
                 <td>
                   <div class="btn-group" role="group">
@@ -209,10 +274,41 @@ $users = $stmt->fetchAll();
             </div>
             <div class="col-md-6">
               <label class="form-label">Role</label>
-              <select name="role" id="editRole" class="form-select">
-                <option value="staff">Staff</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
+              <select name="role" id="editRole" class="form-select" onchange="toggleEditOrgFields()" <?php echo $is_area_manager ? 'disabled' : ''; ?>>
+                <?php if ($is_area_manager): ?>
+                  <option value="store_supervisor">Store Supervisor</option>
+                <?php else: ?>
+                  <option value="borrower">Borrower/Staff</option>
+                  <option value="store_supervisor">Store Supervisor</option>
+                  <option value="area_manager">Area Manager</option>
+                  <option value="admin">Admin</option>
+                  <option value="staff">Staff (Legacy)</option>
+                  <option value="manager">Manager (Legacy)</option>
+                <?php endif; ?>
+              </select>
+            </div>
+            
+            <!-- Area field for Area Managers -->
+            <div class="col-md-6" id="editUserAreaRow" style="display:none;">
+              <label class="form-label">Assigned Area</label>
+              <select name="area_id" id="editUserAreaSelect" class="form-select">
+                <option value="">-- Select Area --</option>
+              </select>
+            </div>
+            
+            <!-- Store field for Store Supervisors -->
+            <div class="col-md-6" id="editUserStoreRow" style="display:none;">
+              <label class="form-label">Assigned Store</label>
+              <select name="store_id" id="editUserStoreSelect" class="form-select">
+                <option value="">-- Select Store --</option>
+              </select>
+            </div>
+            
+            <!-- Manager field -->
+            <div class="col-md-6" id="editUserManagerRow" style="display:none;">
+              <label class="form-label">Reports To</label>
+              <select name="managed_by_user_id" id="editUserManagerSelect" class="form-select">
+                <option value="">-- Select Manager --</option>
               </select>
             </div>
           </div>
@@ -347,12 +443,51 @@ $users = $stmt->fetchAll();
           </div>
           <div class="mb-2">
             <label class="form-label">Role</label>
-            <select name="role" class="form-select">
-              <option value="staff">staff</option>
-              <option value="manager">manager</option>
-              <option value="admin">admin</option>
+            <select name="role" id="addUserRole" class="form-select" onchange="toggleOrgFields()" <?php echo $is_area_manager ? 'disabled' : ''; ?>>
+              <?php if ($is_area_manager): ?>
+                <option value="store_supervisor" selected>Store Supervisor</option>
+              <?php else: ?>
+                <option value="borrower">Borrower/Staff</option>
+                <option value="store_supervisor">Store Supervisor</option>
+                <option value="area_manager">Area Manager</option>
+                <option value="admin">Admin</option>
+              <?php endif; ?>
+            </select>
+            <?php if ($is_area_manager): ?>
+              <input type="hidden" name="role" value="store_supervisor">
+            <?php endif; ?>
+          </div>
+          
+          <!-- Area field for Area Managers -->
+          <div class="mb-2" id="addUserAreaRow" style="<?php echo $is_admin ? 'display:none;' : 'display:none;'; ?>">
+            <label class="form-label">Assigned Area</label>
+            <select name="area_id" id="addUserAreaSelect" class="form-select">
+              <option value="">-- Select Area --</option>
             </select>
           </div>
+          
+          <!-- Store field for Store Supervisors -->
+          <div class="mb-2" id="addUserStoreRow" style="<?php echo $is_area_manager ? 'display:block;' : 'display:none;'; ?>">
+            <label class="form-label">Assigned Store <span class="text-danger">*</span></label>
+            <select name="store_id" id="addUserStoreSelect" class="form-select" <?php echo $is_area_manager ? 'required' : ''; ?>>
+              <option value="">-- Select Store --</option>
+            </select>
+            <?php if ($is_area_manager): ?>
+              <small class="text-muted">Only stores in your area are shown</small>
+            <?php endif; ?>
+          </div>
+          
+          <!-- Manager field (hidden, auto-set to current area manager) -->
+          <?php if ($is_area_manager): ?>
+            <input type="hidden" name="managed_by_user_id" value="<?php echo $current_user['id']; ?>">
+          <?php else: ?>
+          <div class="mb-2" id="addUserManagerRow" style="display:none;">
+            <label class="form-label">Reports To</label>
+            <select name="managed_by_user_id" id="addUserManagerSelect" class="form-select">
+              <option value="">-- Select Manager --</option>
+            </select>
+          </div>
+          <?php endif; ?>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -550,6 +685,101 @@ $users = $stmt->fetchAll();
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
   
+  <script>
+  // Load organizational data for dropdowns
+  let areasData = [];
+  let storesData = [];
+  const isAreaManager = <?php echo $is_area_manager ? 'true' : 'false'; ?>;
+  const userAreaId = <?php echo $user_area_id ? $user_area_id : 'null'; ?>;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadOrganizationalData();
+  });
+
+  async function loadOrganizationalData() {
+    try {
+      // Load areas
+      const areasRes = await fetch('get_areas.php');
+      const areasJson = await areasRes.json();
+      if (areasJson.success) {
+        areasData = areasJson.areas.filter(a => a.is_active == 1);
+      }
+      
+      // Load stores
+      const storesRes = await fetch('get_stores.php');
+      const storesJson = await storesRes.json();
+      if (storesJson.success) {
+        storesData = storesJson.stores.filter(s => s.is_active == 1);
+        
+        // Filter stores by area manager's area
+        if (isAreaManager && userAreaId) {
+          storesData = storesData.filter(s => s.area_id == userAreaId);
+        }
+      }
+      
+      // Populate dropdowns
+      populateAreaDropdowns();
+      populateStoreDropdowns();
+    } catch (err) {
+      console.error('Error loading organizational data:', err);
+    }
+  }
+
+  function populateAreaDropdowns() {
+    const selects = ['addUserAreaSelect', 'editUserAreaSelect'];
+    selects.forEach(id => {
+      const select = document.getElementById(id);
+      if (!select) return;
+      
+      select.innerHTML = '<option value="">-- Select Area --</option>';
+      areasData.forEach(area => {
+        const option = document.createElement('option');
+        option.value = area.area_id;
+        option.textContent = area.area_name;
+        select.appendChild(option);
+      });
+    });
+  }
+
+  function populateStoreDropdowns(areaId = null) {
+    const selects = ['addUserStoreSelect', 'editUserStoreSelect'];
+    selects.forEach(id => {
+      const select = document.getElementById(id);
+      if (!select) return;
+      
+      select.innerHTML = '<option value="">-- Select Store --</option>';
+      
+      const filteredStores = areaId 
+        ? storesData.filter(s => s.area_id == areaId)
+        : storesData;
+      
+      filteredStores.forEach(store => {
+        const option = document.createElement('option');
+        option.value = store.store_id;
+        option.textContent = `${store.store_name} (${store.store_code})`;
+        option.setAttribute('data-area-id', store.area_id || '');
+        select.appendChild(option);
+      });
+    });
+  }
+
+  function toggleOrgFields() {
+    const role = document.getElementById('addUserRole').value;
+    
+    document.getElementById('addUserAreaRow').style.display = role === 'area_manager' ? 'block' : 'none';
+    document.getElementById('addUserStoreRow').style.display = role === 'store_supervisor' ? 'block' : 'none';
+    document.getElementById('addUserManagerRow').style.display = (role === 'store_supervisor' || role === 'area_manager') ? 'block' : 'none';
+  }
+
+  function toggleEditOrgFields() {
+    const role = document.getElementById('editRole').value;
+    
+    document.getElementById('editUserAreaRow').style.display = role === 'area_manager' ? 'block' : 'none';
+    document.getElementById('editUserStoreRow').style.display = role === 'store_supervisor' ? 'block' : 'none';
+    document.getElementById('editUserManagerRow').style.display = (role === 'store_supervisor' || role === 'area_manager') ? 'block' : 'none';
+  }
+  </script>
+  
   <!-- Select2 JS -->
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
@@ -688,69 +918,194 @@ $users = $stmt->fetchAll();
     }
 
     function returnEquipment(assignmentId, itemName) {
+      // Store current user ID for reloading after return
+      const userId = document.getElementById('detailUsername').getAttribute('data-user-id');
+      
       // Set modal data
       document.getElementById('returnAssignmentId').value = assignmentId;
       document.getElementById('returnItemName').textContent = itemName;
+      document.getElementById('returnMinorIssueDetails').value = '';
       document.getElementById('returnDamageDetails').value = '';
+      document.getElementById('incidentReportPhoto').value = '';
+      document.getElementById('minorIssueContainer').style.display = 'none';
       document.getElementById('damageDetailsContainer').style.display = 'none';
+      document.getElementById('photoPreview').style.display = 'none';
       document.getElementById('returnCondition').value = 'perfectly-working';
       
-      // Show modal
-      const returnModal = new bootstrap.Modal(document.getElementById('returnEquipmentModal'));
-      returnModal.show();
+      // Store user ID in return modal for later use
+      document.getElementById('returnEquipmentModal').setAttribute('data-user-id', userId);
+      
+      // Close user detail modal first
+      const userDetailModalEl = document.getElementById('userDetailModal');
+      const userDetailModal = bootstrap.Modal.getInstance(userDetailModalEl);
+      if (userDetailModal) {
+        userDetailModal.hide();
+      }
+      
+      // Wait for user detail modal to finish hiding, then show return modal
+      userDetailModalEl.addEventListener('hidden.bs.modal', function openReturnModal() {
+        // Remove this event listener after it fires once
+        userDetailModalEl.removeEventListener('hidden.bs.modal', openReturnModal);
+        
+        // Get return modal element
+        const returnModalEl = document.getElementById('returnEquipmentModal');
+        
+        // Check if modal instance already exists and dispose it
+        let returnModal = bootstrap.Modal.getInstance(returnModalEl);
+        if (returnModal) {
+          returnModal.dispose();
+        }
+        
+        // Create new modal instance
+        returnModal = new bootstrap.Modal(returnModalEl, {
+          backdrop: true,
+          keyboard: true,
+          focus: true
+        });
+        
+        // Show modal
+        returnModal.show();
+      }, { once: true });
     }
     
     // Handle return condition change
     function handleReturnConditionChange() {
       const condition = document.getElementById('returnCondition').value;
+      const minorIssueContainer = document.getElementById('minorIssueContainer');
       const damageContainer = document.getElementById('damageDetailsContainer');
-      if (condition === 'damaged') {
+      
+      // Hide all containers first
+      minorIssueContainer.style.display = 'none';
+      damageContainer.style.display = 'none';
+      document.getElementById('returnMinorIssueDetails').required = false;
+      document.getElementById('returnDamageDetails').required = false;
+      
+      if (condition === 'minor-issue') {
+        minorIssueContainer.style.display = 'block';
+        document.getElementById('returnMinorIssueDetails').required = true;
+      } else if (condition === 'damaged') {
         damageContainer.style.display = 'block';
         document.getElementById('returnDamageDetails').required = true;
-      } else {
-        damageContainer.style.display = 'none';
-        document.getElementById('returnDamageDetails').required = false;
       }
     }
+    
+    // Handle photo preview
+    document.addEventListener('DOMContentLoaded', function() {
+      const photoInput = document.getElementById('incidentReportPhoto');
+      if (photoInput) {
+        photoInput.addEventListener('change', function(e) {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              document.getElementById('photoPreviewImg').src = e.target.result;
+              document.getElementById('photoPreview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+          } else {
+            document.getElementById('photoPreview').style.display = 'none';
+          }
+        });
+      }
+    });
     
     // Submit return form
     function submitReturnEquipment() {
       const assignmentId = document.getElementById('returnAssignmentId').value;
       const condition = document.getElementById('returnCondition').value;
+      const minorIssueDetails = document.getElementById('returnMinorIssueDetails').value;
       const damageDetails = document.getElementById('returnDamageDetails').value;
+      const photoFile = document.getElementById('incidentReportPhoto').files[0];
+      const confirmBtn = document.getElementById('confirmReturnBtn');
+      
+      // Validation
+      if (condition === 'minor-issue' && !minorIssueDetails.trim()) {
+        alert('Please describe the minor issue details');
+        return;
+      }
       
       if (condition === 'damaged' && !damageDetails.trim()) {
         alert('Please describe the damage details');
         return;
       }
       
-      const formData = new URLSearchParams();
+      // Create FormData for file upload
+      const formData = new FormData();
       formData.append('assignment_id', assignmentId);
       formData.append('return_condition', condition);
-      formData.append('damage_details', damageDetails);
+      
+      // Combine details based on condition
+      let combinedDetails = '';
+      if (condition === 'minor-issue') {
+        combinedDetails = minorIssueDetails;
+      } else if (condition === 'damaged') {
+        combinedDetails = damageDetails;
+      }
+      formData.append('damage_details', combinedDetails);
+      
+      // Append photo if present
+      if (photoFile) {
+        formData.append('incident_photo', photoFile);
+      }
+      
+      // Disable button
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
       
       fetch('return_equipment.php', {
         method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: formData.toString()
+        body: formData
       })
-      .then(response => response.json())
+      .then(response => {
+        // Check if response is ok and content-type is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          // Response is not JSON, likely an error page
+          return response.text().then(text => {
+            console.error('Non-JSON response:', text);
+            throw new Error('Server returned invalid response. Please check console for details.');
+          });
+        }
+        return response.json();
+      })
       .then(data => {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-check"></i> Confirm Return';
+        
         if (data.success) {
           // Close return modal
-          const returnModal = bootstrap.Modal.getInstance(document.getElementById('returnEquipmentModal'));
-          returnModal.hide();
+          const returnModalEl = document.getElementById('returnEquipmentModal');
+          const returnModal = bootstrap.Modal.getInstance(returnModalEl);
+          if (returnModal) {
+            returnModal.hide();
+          }
           
-          // Reload the equipment list
-          const userId = document.getElementById('detailUsername').getAttribute('data-user-id');
-          loadUserEquipment(userId);
-          alert('Equipment returned successfully!');
+          // Get user ID from return modal
+          const userId = returnModalEl.getAttribute('data-user-id');
+          
+          // Show success message
+          alert('Equipment returned successfully!' + (data.photo_url ? '\nIncident report saved.' : ''));
+          
+          // Wait for return modal to hide, then reopen user detail modal
+          returnModalEl.addEventListener('hidden.bs.modal', function reopenUserModal() {
+            returnModalEl.removeEventListener('hidden.bs.modal', reopenUserModal);
+            
+            // Reopen user detail modal
+            const userDetailModalEl = document.getElementById('userDetailModal');
+            const userDetailModal = new bootstrap.Modal(userDetailModalEl);
+            userDetailModal.show();
+            
+            // Reload equipment list after modal is shown
+            loadUserEquipment(userId);
+          }, { once: true });
         } else {
           alert('Error: ' + data.message);
         }
       })
       .catch(error => {
-        alert('Error returning equipment');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-check"></i> Confirm Return';
+        alert('Error returning equipment: ' + error.message);
       });
     }
 
@@ -1060,7 +1415,7 @@ $users = $stmt->fetchAll();
   <!-- Return Equipment Modal -->
   <div class="modal fade" id="returnEquipmentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
-      <form onsubmit="event.preventDefault(); submitReturnEquipment();" class="modal-content">
+      <form onsubmit="event.preventDefault(); submitReturnEquipment();" class="modal-content" id="returnEquipmentForm" enctype="multipart/form-data">
         <div class="modal-header">
           <h5 class="modal-title">Return Equipment</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -1080,17 +1435,36 @@ $users = $stmt->fetchAll();
             </select>
           </div>
           
+          <!-- Minor Issue Details -->
+          <div id="minorIssueContainer" style="display: none;">
+            <div class="mb-3">
+              <label class="form-label">Issue Details <span class="text-danger">*</span></label>
+              <textarea id="returnMinorIssueDetails" class="form-control" rows="2" placeholder="Describe the minor issue or dent..."></textarea>
+              <small class="text-muted">Please provide details about the issue</small>
+            </div>
+          </div>
+          
+          <!-- Damage Details -->
           <div id="damageDetailsContainer" style="display: none;">
             <div class="mb-3">
               <label class="form-label">Damage Details <span class="text-danger">*</span></label>
               <textarea id="returnDamageDetails" class="form-control" rows="3" placeholder="Describe the damage in detail..."></textarea>
               <small class="text-muted">Please provide details about the damage</small>
             </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Incident Report Photo</label>
+              <input type="file" id="incidentReportPhoto" class="form-control" accept="image/*">
+              <small class="text-muted">Upload a photo of the damaged equipment (optional but recommended)</small>
+              <div id="photoPreview" class="mt-2" style="display: none;">
+                <img id="photoPreviewImg" src="" alt="Preview" style="max-width: 100%; max-height: 200px; border: 1px solid #ddd; border-radius: 4px; padding: 5px;">
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-warning">
+          <button type="submit" class="btn btn-warning" id="confirmReturnBtn">
             <i class="fas fa-check"></i> Confirm Return
           </button>
         </div>

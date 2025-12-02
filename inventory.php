@@ -77,8 +77,22 @@ $departments = $pdo->query('SELECT DISTINCT department FROM users WHERE departme
     table tbody tr:hover{background:#f8f9fa}
     .badge-available { background: #28a745; }
     .badge-borrowed { background: #ffc107; color: #000; }
+    .badge-damaged { background: #dc3545; }
+    .badge-to-be-repair { background: #fd7e14; }
     .badge-maintenance { background: #dc3545; }
     .badge-retired { background: #6c757d; }
+    .badge { 
+      display: inline-block; 
+      padding: 0.35em 0.65em; 
+      font-size: 0.875em; 
+      font-weight: 600; 
+      line-height: 1; 
+      color: #fff; 
+      text-align: center; 
+      white-space: nowrap; 
+      vertical-align: baseline; 
+      border-radius: 0.375rem; 
+    }
     .filter-section { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; }
     .search-box { max-width: 400px; }
   </style>
@@ -202,12 +216,20 @@ $departments = $pdo->query('SELECT DISTINCT department FROM users WHERE departme
                   $serial = $attrs['S_N'] ?? $attrs['s_n'] ?? $attrs['SERIAL_NUMBER'] ?? $attrs['serial_number'] ?? $attrs['SN'] ?? $attrs['sn'] ?? 'N/A';
                   
                   // Status badge
-                  $statusClass = 'badge-' . $item['status'];
-                  $statusText = ucfirst($item['status']);
+                  $status = $item['status'] ?? 'available';
+                  $statusClass = 'badge-' . str_replace(' ', '-', strtolower($status));
+                  $statusText = ucwords($status);
                 ?>
                 <tr>
                   <td>
-                    <strong><?php echo htmlspecialchars($item['display_name']); ?></strong>
+                    <strong>
+                      <a href="#" class="text-decoration-none" 
+                         data-bs-toggle="modal" 
+                         data-bs-target="#itemHistoryModal"
+                         onclick="viewItemHistory(<?php echo $item['id']; ?>); return false;">
+                        <?php echo htmlspecialchars($item['display_name']); ?>
+                      </a>
+                    </strong>
                   </td>
                   <td>
                     <span class="badge bg-light text-dark border">
@@ -260,6 +282,18 @@ $departments = $pdo->query('SELECT DISTINCT department FROM users WHERE departme
                               data-category-id="<?php echo $item['category_id']; ?>"
                               data-attributes='<?php echo htmlspecialchars(json_encode(json_decode($item['attributes'], true) ?? []), ENT_QUOTES); ?>'>
                         <i class="fas fa-edit"></i>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" 
+                              onclick="deleteItem(<?php echo $item['id']; ?>, '<?php echo htmlspecialchars($item['display_name'], ENT_QUOTES); ?>')">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    <?php endif; ?>
+                    <?php if (in_array($item['status'], ['damaged', 'to be repair'], true)): ?>
+                      <button class="btn btn-sm btn-outline-info" 
+                              data-bs-toggle="modal" 
+                              data-bs-target="#changeStatusModal"
+                              onclick="openChangeStatus(<?php echo $item['id']; ?>, '<?php echo htmlspecialchars($item['display_name'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($item['status'], ENT_QUOTES); ?>')">
+                        <i class="fas fa-wrench"></i>
                       </button>
                     <?php endif; ?>
                   </td>
@@ -328,6 +362,111 @@ $departments = $pdo->query('SELECT DISTINCT department FROM users WHERE departme
     </div>
   </div>
 
+  <!-- Item History Modal -->
+  <div class="modal fade" id="itemHistoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Item History: <span id="historyItemName"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="nav nav-tabs mb-3" id="historyTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="borrower-tab" data-bs-toggle="tab" data-bs-target="#borrower-history" type="button" role="tab">
+                <i class="fas fa-users"></i> Borrower History
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="modifier-tab" data-bs-toggle="tab" data-bs-target="#modifier-history" type="button" role="tab">
+                <i class="fas fa-edit"></i> Modifier Edit History
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" id="repair-tab" data-bs-toggle="tab" data-bs-target="#repair-history" type="button" role="tab">
+                <i class="fas fa-wrench"></i> Repair History
+              </button>
+            </li>
+          </ul>
+          <div class="tab-content" id="historyTabContent">
+            <!-- Borrower History Tab -->
+            <div class="tab-pane fade show active" id="borrower-history" role="tabpanel">
+              <div id="borrowerHistoryContent" style="max-height: 500px; overflow-y: auto;">
+                <div class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Modifier Edit History Tab -->
+            <div class="tab-pane fade" id="modifier-history" role="tabpanel">
+              <div id="modifierHistoryContent" style="max-height: 500px; overflow-y: auto;">
+                <div class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Repair History Tab -->
+            <div class="tab-pane fade" id="repair-history" role="tabpanel">
+              <div id="repairHistoryContent" style="max-height: 500px; overflow-y: auto;">
+                <div class="text-center py-4">
+                  <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change Status Modal -->
+  <div class="modal fade" id="changeStatusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Change Item Status</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="changeStatusItemId">
+          <div class="alert alert-info">
+            <i class="fas fa-wrench"></i> <strong id="changeStatusItemName"></strong><br>
+            <small>Current Status: <span class="badge bg-secondary" id="changeStatusCurrentStatus"></span></small>
+          </div>
+          <div class="mb-3">
+            <label for="newStatusSelect" class="form-label">New Status</label>
+            <select class="form-select" id="newStatusSelect" required>
+              <option value="">-- Select Status --</option>
+              <option value="damaged">Damaged</option>
+              <option value="to be repair">To Be Repair</option>
+              <option value="available">Available</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="statusChangeNotes" class="form-label">Notes</label>
+            <textarea class="form-control" id="statusChangeNotes" rows="3" placeholder="Enter details about status change..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" onclick="submitStatusChange()">
+            <i class="fas fa-save"></i> Update Status
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Repair History Modal -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // View Item Details
@@ -420,6 +559,324 @@ $departments = $pdo->query('SELECT DISTINCT department FROM users WHERE departme
           fieldsContainer.innerHTML = '<div class="alert alert-danger">Error loading modifiers</div>';
         });
     });
+    
+    // View Item History Function
+    function viewItemHistory(itemId) {
+      document.getElementById('historyItemName').textContent = 'Loading...';
+      
+      // Load borrower history
+      loadBorrowerHistory(itemId);
+      
+      // Load modifier history when tab is shown
+      document.getElementById('modifier-tab').addEventListener('shown.bs.tab', function (event) {
+        loadModifierHistory(itemId);
+      }, { once: true });
+      
+      // Load repair history when tab is shown
+      document.getElementById('repair-tab').addEventListener('shown.bs.tab', function (event) {
+        loadRepairHistoryTab(itemId);
+      }, { once: true });
+    }
+    
+    // Load Borrower History
+    function loadBorrowerHistory(itemId) {
+      const content = document.getElementById('borrowerHistoryContent');
+      content.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+      
+      fetch('get_item_borrower_history.php?item_id=' + itemId)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            document.getElementById('historyItemName').textContent = data.item_name;
+            
+            if (data.history.length === 0) {
+              content.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No borrower history found. This item has never been assigned.</div>';
+              return;
+            }
+            
+            // Build timeline with all movements (assignments and returns)
+            let html = '<div class="timeline-container" style="position: relative; padding-left: 30px;">';
+            
+            data.history.forEach((record, index) => {
+              const isActive = !record.returned_at;
+              const isFirst = index === 0;
+              
+              // Assignment Event
+              html += `
+                <div class="timeline-item mb-4" style="position: relative;">
+                  <div class="timeline-marker" style="position: absolute; left: -30px; width: 20px; height: 20px; background: #28a745; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 3px #e9ecef;"></div>
+                  <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                          <i class="fas fa-arrow-circle-right"></i> <strong>ASSIGNED</strong>
+                          ${isActive ? '<span class="badge bg-warning text-dark ms-2"><i class="fas fa-clock"></i> Currently Active</span>' : ''}
+                        </div>
+                        <small>${escapeHtml(record.assigned_at)}</small>
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      <h6 class="mb-2"><i class="fas fa-user"></i> ${escapeHtml(record.user_name)}</h6>
+                      <div class="row">
+                        <div class="col-md-6">
+                          <small><strong>Department:</strong> ${escapeHtml(record.department || 'N/A')}</small>
+                        </div>
+                        <div class="col-md-6">
+                          <small><strong>Region:</strong> ${escapeHtml(record.region || 'N/A')}</small>
+                        </div>
+                      </div>
+                      ${record.notes ? `<div class="mt-2"><small><strong>Notes:</strong> ${escapeHtml(record.notes)}</small></div>` : ''}
+                    </div>
+                  </div>
+                </div>
+              `;
+              
+              // Return Event (if returned)
+              if (record.returned_at) {
+                const conditionBadge = {
+                  'perfectly-working': 'bg-success',
+                  'minor-issue': 'bg-warning text-dark',
+                  'damaged': 'bg-danger'
+                }[record.return_condition] || 'bg-secondary';
+                
+                const conditionText = {
+                  'perfectly-working': 'Perfectly Working',
+                  'minor-issue': 'Minor Issue',
+                  'damaged': 'Damaged'
+                }[record.return_condition] || record.return_condition;
+                
+                // Calculate duration
+                const assignedDate = new Date(record.assigned_at);
+                const returnedDate = new Date(record.returned_at);
+                const diffDays = Math.floor((returnedDate - assignedDate) / (1000 * 60 * 60 * 24));
+                const durationText = diffDays > 0 ? `${diffDays} day${diffDays > 1 ? 's' : ''}` : 'Same day';
+                
+                html += `
+                  <div class="timeline-item mb-4" style="position: relative;">
+                    <div class="timeline-marker" style="position: absolute; left: -30px; width: 20px; height: 20px; background: #6c757d; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 3px #e9ecef;"></div>
+                    <div class="card shadow-sm">
+                      <div class="card-header bg-secondary text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <div>
+                            <i class="fas fa-arrow-circle-left"></i> <strong>RETURNED</strong>
+                            <span class="badge bg-light text-dark ms-2"><i class="fas fa-clock"></i> Duration: ${durationText}</span>
+                          </div>
+                          <small>${escapeHtml(record.returned_at)}</small>
+                        </div>
+                      </div>
+                      <div class="card-body">
+                        <div class="mb-2">
+                          <strong>Condition:</strong> <span class="badge ${conditionBadge}">${conditionText}</span>
+                        </div>
+                        ${record.damage_details ? `
+                          <div class="alert alert-danger mb-0">
+                            <strong><i class="fas fa-exclamation-triangle"></i> Damage Details:</strong><br>
+                            ${escapeHtml(record.damage_details)}
+                          </div>
+                        ` : ''}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+              
+              // Add connecting line (except for last item)
+              if (index < data.history.length - 1 || isActive) {
+                html += '<div style="position: absolute; left: -21px; width: 2px; height: 20px; background: #dee2e6;"></div>';
+              }
+            });
+            
+            html += '</div>';
+            content.innerHTML = html;
+          } else {
+            content.innerHTML = '<div class="alert alert-danger">Error loading history: ' + escapeHtml(data.error) + '</div>';
+          }
+        })
+        .catch(error => {
+          content.innerHTML = '<div class="alert alert-danger">Error loading history</div>';
+        });
+    }
+    
+    // Load Modifier History
+    function loadModifierHistory(itemId) {
+      const content = document.getElementById('modifierHistoryContent');
+      content.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+      
+      fetch('get_item_modifier_history.php?item_id=' + itemId)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            if (data.history.length === 0) {
+              content.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No modifier edit history found</div>';
+              return;
+            }
+            
+            let html = '<div class="timeline">';
+            data.history.forEach((record, index) => {
+              html += `
+                <div class="card mb-3">
+                  <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between">
+                      <span><i class="fas fa-clock"></i> ${escapeHtml(record.changed_at)}</span>
+                      <span class="badge bg-primary">${escapeHtml(record.changed_by)}</span>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="row">
+              `;
+              
+              // Show changes
+              if (record.changes && record.changes.length > 0) {
+                record.changes.forEach(change => {
+                  html += `
+                    <div class="col-md-6 mb-2">
+                      <strong>${escapeHtml(change.field)}:</strong><br>
+                      <span class="text-danger"><del>${escapeHtml(change.old_value || 'empty')}</del></span>
+                      <i class="fas fa-arrow-right mx-2"></i>
+                      <span class="text-success"><strong>${escapeHtml(change.new_value || 'empty')}</strong></span>
+                    </div>
+                  `;
+                });
+              } else {
+                html += '<div class="col-12"><em class="text-muted">No changes recorded</em></div>';
+              }
+              
+              html += `
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            html += '</div>';
+            content.innerHTML = html;
+          } else {
+            content.innerHTML = '<div class="alert alert-danger">Error loading modifier history: ' + escapeHtml(data.error) + '</div>';
+          }
+        })
+        .catch(error => {
+          content.innerHTML = '<div class="alert alert-danger">Error loading modifier history</div>';
+        });
+    }
+    
+    // Delete Item Function
+    function deleteItem(itemId, itemName) {
+      if (confirm('Are you sure you want to delete "' + itemName + '"? This action cannot be undone.')) {
+        fetch('delete_item.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'item_id=' + itemId
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            alert('Item deleted successfully');
+            window.location.reload();
+          } else {
+            alert('Error: ' + data.message);
+          }
+        })
+        .catch(error => {
+          alert('Error deleting item');
+        });
+      }
+    }
+    
+    // Open Change Status Modal
+    function openChangeStatus(itemId, itemName, currentStatus) {
+      document.getElementById('changeStatusItemId').value = itemId;
+      document.getElementById('changeStatusItemName').textContent = itemName;
+      document.getElementById('changeStatusCurrentStatus').textContent = currentStatus;
+      document.getElementById('newStatusSelect').value = '';
+      document.getElementById('statusChangeNotes').value = '';
+    }
+    
+    // Submit Status Change
+    function submitStatusChange() {
+      const itemId = document.getElementById('changeStatusItemId').value;
+      const newStatus = document.getElementById('newStatusSelect').value;
+      const notes = document.getElementById('statusChangeNotes').value;
+      
+      if (!newStatus) {
+        alert('Please select a new status');
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append('item_id', itemId);
+      formData.append('new_status', newStatus);
+      formData.append('notes', notes);
+      
+      fetch('change_item_status.php', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert('Status updated successfully');
+          bootstrap.Modal.getInstance(document.getElementById('changeStatusModal')).hide();
+          window.location.reload();
+        } else {
+          alert('Error: ' + data.message);
+        }
+      })
+      .catch(error => {
+        alert('Error updating status');
+      });
+    }
+    
+    // Load Repair History Tab
+    function loadRepairHistoryTab(itemId) {
+      const content = document.getElementById('repairHistoryContent');
+      content.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+      
+      fetch('get_repair_history.php?item_id=' + itemId)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            if (data.history.length === 0) {
+              content.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No repair history found</div>';
+              return;
+            }
+            
+            let html = '<div class="timeline">';
+            data.history.forEach((record, index) => {
+              html += `
+                <div class="card mb-3">
+                  <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <span><i class="fas fa-clock"></i> ${escapeHtml(record.changed_at)}</span>
+                      <span class="badge bg-primary">${escapeHtml(record.username || 'System')}</span>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                      <span class="badge bg-danger">${escapeHtml(record.old_status)}</span>
+                      <i class="fas fa-arrow-right mx-3"></i>
+                      <span class="badge bg-success">${escapeHtml(record.new_status)}</span>
+                    </div>
+                    ${record.notes ? '<p class="mb-0"><strong>Notes:</strong> ' + escapeHtml(record.notes) + '</p>' : '<p class="mb-0 text-muted"><em>No notes provided</em></p>'}
+                  </div>
+                </div>
+              `;
+            });
+            html += '</div>';
+            content.innerHTML = html;
+          } else {
+            content.innerHTML = '<div class="alert alert-danger">Error loading repair history: ' + escapeHtml(data.error) + '</div>';
+          }
+        })
+        .catch(error => {
+          content.innerHTML = '<div class="alert alert-danger">Error loading repair history</div>';
+        });
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
   </script>
 </body>
 </html>
+

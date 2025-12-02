@@ -36,13 +36,17 @@ $pdo = $GLOBALS['pdo'];
 try {
     $pdo->beginTransaction();
     
-    // Check if item is available
+    // Check if item is available and not damaged
     $checkStmt = $pdo->prepare('SELECT i.status, i.display_name, i.attributes, c.name as category_name FROM items i LEFT JOIN categories c ON i.category_id = c.id WHERE i.id = :item_id');
     $checkStmt->execute([':item_id' => $itemId]);
     $item = $checkStmt->fetch();
     
     if (!$item) {
         throw new Exception('Equipment not found');
+    }
+    
+    if ($item['status'] === 'damaged' || $item['status'] === 'to be repair') {
+        throw new Exception('Equipment is damaged and cannot be assigned. Please repair it first.');
     }
     
     if ($item['status'] !== 'available') {

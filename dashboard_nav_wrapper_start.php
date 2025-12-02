@@ -50,6 +50,14 @@ $user = $_SESSION['user'];
         </div>
         <a href="accountability.php" class="list-group-item list-group-item-action">Release/Return</a>
         <a href="#" class="list-group-item list-group-item-action">Reports</a>
+        <?php if (isset($user['role']) && in_array($user['role'], ['admin', 'area_manager'])): ?>
+          <a href="stores.php" class="list-group-item list-group-item-action">Stores</a>
+          <a href="supervisor_movements.php" class="list-group-item list-group-item-action">Supervisor Movements</a>
+        <?php endif; ?>
+        <?php if (isset($user['role']) && $user['role'] === 'store_supervisor'): ?>
+          <a href="my_store.php" class="list-group-item list-group-item-action">My Store</a>
+          <a href="supervisor_movements.php" class="list-group-item list-group-item-action">My Movement History</a>
+        <?php endif; ?>
         <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
           <a href="users.php" class="list-group-item list-group-item-action">Users</a>
         <?php endif; ?>

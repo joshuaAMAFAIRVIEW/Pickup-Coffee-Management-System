@@ -1,69 +1,3 @@
-# Google Sheets Apps Script Setup
-
-## Overview
-This system uses **ONE Google Spreadsheet** with multiple tabs:
-- **Sheet1** (or Bulk Add) - For bulk importing items
-- **Release** - Logs equipment assignments/releases
-- **Return** - Logs equipment returns (organized by condition)
-
-You'll deploy TWO Apps Script functions in the same spreadsheet:
-1. **Equipment Logging** - Handles Release and Return logging
-2. **Bulk Import Row Deletion** - Deletes successfully imported rows from Sheet1
-
----
-
-## PART 1: Equipment Logging (Release/Return)
-
-### Step 1: Use Your Existing Spreadsheet
-
-1. Open your existing bulk import spreadsheet (the one with spreadsheet ID: `1PxmVtCPTl82B2UQw72oD7rhMTef0Lpr1gyp47Uk1gzQ`)
-2. Add two new tabs:
-   - **Release** (for equipment assignments/releases)
-   - **Return** (for equipment returns)
-3. Keep your existing **Sheet1** tab for bulk imports
-
-## Step 2: Set Up Sheet Headers
-
-### Release Tab Headers (Row 1):
-| Timestamp | Item Name | Category | User Name | Username | Department | Region | Assigned At | Item Condition | Notes | Serial Number | Other Attributes |
-
-### Return Tab Structure:
-The Return tab is organized into **3 sections** based on return condition:
-
-#### Section 1: PERFECTLY WORKING (Starting at Row 1)
-**Headers (Row 1):**
-| Timestamp | Item Name | Category | User Name | Username | Department | Region | Assigned At | Returned At | Serial Number | Other Attributes | Incident Photo |
-
-#### Section 2: MINOR DENT/PROBLEM (Leave 2 empty rows after last perfectly working item)
-**Headers:**
-| Timestamp | Item Name | Category | User Name | Username | Department | Region | Assigned At | Returned At | Issue Details | Serial Number | Other Attributes |
-
-#### Section 3: DAMAGED (Leave 2 empty rows after last minor issue item)
-**Headers:**
-| Timestamp | Item Name | Category | User Name | Username | Department | Region | Assigned At | Returned At | Damage Details | Serial Number | Other Attributes | Incident Photo |
-
-**Note:** Set up initial headers manually, then the script will append items to the correct section.
-
-## Step 3: Deploy Apps Script
-
-1. In your Google Sheet, go to **Extensions > Apps Script**
-2. If you already have the bulk import deletion script, add the code below to the same file
-3. If starting fresh, delete any default code and paste all the code below
-4. **Important:** Make sure both functions (`doPost` and `deleteRows`) are in the same script file
-5. Click **Deploy > New deployment** (or update existing deployment)
-6. Choose type: **Web app**
-7. Settings:
-   - Execute as: **Me**
-   - Who has access: **Anyone**
-8. Click **Deploy**
-9. Copy the **Web app URL**
-10. Paste the URL in both:
-    - `google_sheets_logger.php` → `$webAppUrl` variable
-    - `bulk_import_items.php` → `$appsScriptUrl` variable
-
-## Apps Script Code
-
-```javascript
 // Google Apps Script for Equipment Management
 // Handles: Release logging, Return logging, and Bulk Import row deletion
 
@@ -150,6 +84,10 @@ function doPost(e) {
       if (returnCondition === 'perfectly-working') {
         // Section 1: Perfectly Working (starts at row 2, after header at row 1)
         targetRow = findLastRowInSection(sheet, 1, 'PERFECTLY WORKING') + 1;
+        
+        // Create hyperlink for photo if URL exists
+        const photoCell = incidentPhotoUrl ? `=HYPERLINK("${incidentPhotoUrl}", "View Photo")` : '';
+        
         rowData = [
           timestamp,
           logData.item_name || '',
@@ -162,7 +100,7 @@ function doPost(e) {
           logData.returned_at || '',
           serialNumber,
           otherAttrs,
-          incidentPhotoUrl
+          photoCell
         ];
         
       } else if (returnCondition === 'minor-issue') {
@@ -219,6 +157,10 @@ function doPost(e) {
           ]]);
         }
         targetRow = sheet.getLastRow() + 1;
+        
+        // Create hyperlink for photo if URL exists
+        const photoCell = incidentPhotoUrl ? `=HYPERLINK("${incidentPhotoUrl}", "View Photo")` : '';
+        
         rowData = [
           timestamp,
           logData.item_name || '',
@@ -232,7 +174,7 @@ function doPost(e) {
           logData.damage_details || '',
           serialNumber,
           otherAttrs,
-          incidentPhotoUrl
+          photoCell
         ];
       }
       
@@ -362,86 +304,3 @@ function doGet(e) {
     features: ['release-logging', 'return-logging', 'bulk-import-deletion']
   })).setMimeType(ContentService.MimeType.JSON);
 }
-```
-
-## Step 4: Update PHP Configuration
-
-Now that everything is in one spreadsheet, update both PHP files with the same Web App URL:
-
-### 1. Update google_sheets_logger.php
-```php
-$webAppUrl = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
-```
-
-### 2. Update bulk_import_items.php
-Find line ~24 and update:
-```php
-$appsScriptUrl = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
-```
-
-**Note:** Use the same Web App URL for both files since they're now using the same Apps Script deployment.
-
-## Step 5: Verify Spreadsheet Structure
-
-Your spreadsheet should now have 3 tabs:
-
-1. **Sheet1** (or Bulk Add)
-   - Headers: Category | S/N | MODEL | CPU | RAM | STORAGE | IMEI-1 | IMEI-2 | etc.
-   - Used for bulk importing items
-
-2. **Release**
-   - Headers: Timestamp | Item Name | Category | User Name | Username | Department | Region | Assigned At | Item Condition | Notes | Serial Number | Other Attributes
-   - Logs when equipment is assigned to users
-
-3. **Return**
-   - Section 1: PERFECTLY WORKING (with headers)
-   - Section 2: MINOR DENT/PROBLEM (with section header and field headers)
-   - Section 3: DAMAGED (with section header and field headers)
-   - Logs when equipment is returned, organized by condition
-
-## Step 6: Test Everything
-
-### Test Bulk Import:
-1. Add items to Sheet1
-2. Go to your system → Add Item → Click 📊 Bulk Import
-3. Verify items import correctly
-4. Check that successfully imported rows are deleted from Sheet1
-
-### Test Release Logging:
-1. Go to Users page
-2. Click on a user
-3. Release equipment to them
-4. Check the **Release** tab - new row should appear with assignment details
-
-### Test Return Logging:
-1. Go to Users page
-2. Click on a user with assigned equipment
-3. Click "Return" on an item
-4. Choose condition (Perfectly Working / Minor Issue / Damaged)
-5. Fill in details if needed
-6. Submit return
-7. Check the **Return** tab - item should appear in the correct section
-
-## Step 7: Verify URLs Match
-
-Make sure you're using the same spreadsheet ID everywhere:
-
-**In bulk_import_items.php (line ~15):**
-```php
-$spreadsheetId = '1PxmVtCPTl82B2UQw72oD7rhMTef0Lpr1gyp47Uk1gzQ';
-```
-
-**Your Web App URL should be from this same spreadsheet**
-
-## Troubleshooting
-
-- If data doesn't appear, check Apache error logs: `c:\xampp\apache\logs\error.log`
-- Make sure the sheet names are exactly "Release" and "Return"
-- Verify the Web App is deployed with "Anyone" access
-- Check that headers are in Row 1 of both sheets
-
-## Security Notes
-
-- The Web App URL should be kept secure
-- Consider adding authentication tokens for production use
-- Monitor the Google Apps Script execution logs for any issues

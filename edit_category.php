@@ -109,25 +109,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Custom Modifiers</label>
-                    <p class="small text-muted mb-2">Add any additional fields specific to this category</p>
-                    <div class="input-group mb-3">
-                        <input id="customModInput" class="form-control" placeholder="e.g. Warranty Expiry, Purchase Date">
-                        <button class="btn btn-outline-primary" type="button" id="addCustomModBtn">+ Add</button>
-                    </div>
-                    <div id="customMods">
-                        <?php foreach ($modifiers as $m): ?>
-                            <?php if (!in_array($m['label'], $standard)): ?>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="modifiers[]" value="<?php echo e($m['label']); ?>" id="custom_<?php echo $m['id']; ?>" checked>
-                                    <label class="form-check-label" for="custom_<?php echo $m['id']; ?>"><?php echo e($m['label']); ?></label>
-                                </div>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Update Category
@@ -168,16 +149,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <?php include 'dashboard_nav_wrapper_end.php'; ?>
-
-<script>
-    document.getElementById('addCustomModBtn').addEventListener('click', function (){
-      var v = document.getElementById('customModInput').value.trim();
-      if (!v) return;
-      var id = 'custom_' + Date.now();
-      var div = document.createElement('div');
-      div.className = 'form-check';
-      div.innerHTML = '<input class="form-check-input" type="checkbox" name="modifiers[]" value="'+v+'" id="'+id+'" checked> <label class="form-check-label" for="'+id+'">'+v+'</label>';
-      document.getElementById('customMods').appendChild(div);
-      document.getElementById('customModInput').value = '';
-    });
-</script>

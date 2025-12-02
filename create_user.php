@@ -3,7 +3,11 @@ require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers.php';
 
-require_role(['admin']);
+require_role(['admin', 'area_manager']);
+
+$current_user = $_SESSION['user'];
+$is_admin = $current_user['role'] === 'admin';
+$is_area_manager = $current_user['role'] === 'area_manager';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { header('Location: users.php'); exit; }
 
@@ -11,7 +15,10 @@ $username = trim($_POST['username'] ?? '');
 $employee_number = trim($_POST['employee_number'] ?? '');
 $password = $_POST['password'] ?? '';
 $email = trim($_POST['email'] ?? '');
-$role = $_POST['role'] ?? 'staff';
+$role = $_POST['role'] ?? 'borrower';
+$area_id = !empty($_POST['area_id']) ? (int)$_POST['area_id'] : null;
+$store_id = !empty($_POST['store_id']) ? (int)$_POST['store_id'] : null;
+$managed_by_user_id = !empty($_POST['managed_by_user_id']) ? (int)$_POST['managed_by_user_id'] : null;
 $first = trim($_POST['first_name'] ?? '');
 $middle = trim($_POST['middle_name'] ?? '');
 $last = trim($_POST['last_name'] ?? '');
@@ -19,6 +26,24 @@ $position = trim($_POST['position'] ?? '');
 $department = trim($_POST['department'] ?? '');
 $store = trim($_POST['store'] ?? '');
 $region = trim($_POST['region'] ?? '');
+
+// If area manager is creating user, force role to store_supervisor
+if ($is_area_manager) {
+  $role = 'store_supervisor';
+  $managed_by_user_id = $current_user['id'];
+  
+  // Validate store belongs to their area
+  if ($store_id) {
+    $storeCheck = $pdo->prepare('SELECT s.store_id FROM stores s 
+                                  JOIN users u ON u.id = ? 
+                                  WHERE s.store_id = ? AND s.area_id = u.area_id');
+    $storeCheck->execute([$current_user['id'], $store_id]);
+    if (!$storeCheck->fetch()) {
+      $_SESSION['flash_error'] = 'You can only assign supervisors to stores in your area';
+      header('Location: users.php'); exit;
+    }
+  }
+}
 
 if ($username === '' || $employee_number === '' || $password === '' || $email === '') {
   $_SESSION['flash_error'] = 'Username, employee number, password and email are required';
@@ -36,8 +61,32 @@ try {
   }
 
   $hash = password_hash($password, PASSWORD_DEFAULT);
-  $ins = $pdo->prepare('INSERT INTO users (username, employee_number, password, role, first_name, middle_name, last_name, position, department, store, email, region) VALUES (:u,:empnum,:p,:r,:fn,:mn,:ln,:pos,:dept,:store,:email,:region)');
-  $ins->execute([':u'=>$username,':empnum'=>$employee_number,':p'=>$hash,':r'=>$role,':fn'=>$first,':mn'=>$middle,':ln'=>$last,':pos'=>$position,':dept'=>$department,':store'=>$store,':email'=>$email,':region'=>$region]);
+  $ins = $pdo->prepare('INSERT INTO users (username, employee_number, password, role, area_id, store_id, managed_by_user_id, first_name, middle_name, last_name, position, department, store, email, region) VALUES (:u,:empnum,:p,:r,:area,:store_id,:manager,:fn,:mn,:ln,:pos,:dept,:store,:email,:region)');
+  $ins->execute([
+    ':u'=>$username,
+    ':empnum'=>$employee_number,
+    ':p'=>$hash,
+    ':r'=>$role,
+    ':area'=>$area_id,
+    ':store_id'=>$store_id,
+    ':manager'=>$managed_by_user_id,
+    ':fn'=>$first,
+    ':mn'=>$middle,
+    ':ln'=>$last,
+    ':pos'=>$position,
+    ':dept'=>$department,
+    ':store'=>$store,
+    ':email'=>$email,
+    ':region'=>$region
+  ]);
+  
+  $user_id = $pdo->lastInsertId();
+  
+  // If area manager, record in area_manager_history
+  if ($role === 'area_manager' && $area_id) {
+    $histStmt = $pdo->prepare('INSERT INTO area_manager_history (user_id, area_id, assigned_date) VALUES (?, ?, CURDATE())');
+    $histStmt->execute([$user_id, $area_id]);
+  }
 
   // Prepare and send onboarding email
   $emailSent = false;
