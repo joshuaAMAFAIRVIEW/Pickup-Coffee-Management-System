@@ -303,14 +303,6 @@ $users = $stmt->fetchAll();
                 <option value="">-- Select Store --</option>
               </select>
             </div>
-            
-            <!-- Manager field -->
-            <div class="col-md-6" id="editUserManagerRow" style="display:none;">
-              <label class="form-label">Reports To</label>
-              <select name="managed_by_user_id" id="editUserManagerSelect" class="form-select">
-                <option value="">-- Select Manager --</option>
-              </select>
-            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -366,36 +358,67 @@ $users = $stmt->fetchAll();
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
+          <!-- 1. Employee Number -->
           <div class="mb-2">
-            <label class="form-label">Employee Number</label>
+            <label class="form-label">Employee Number <span class="text-danger">*</span></label>
             <input name="employee_number" class="form-control" required placeholder="e.g. EMP-001">
             <small class="text-muted">Unique employee identifier</small>
           </div>
+          
+          <!-- 2. Username -->
           <div class="mb-2">
-            <label class="form-label">Username</label>
+            <label class="form-label">Username <span class="text-danger">*</span></label>
             <input name="username" class="form-control" required>
           </div>
-          <div class="row g-2">
-            <div class="col">
-              <label class="form-label">First name</label>
+          
+          <!-- 3. First Name, Middle Name, Last Name -->
+          <div class="row g-2 mb-2">
+            <div class="col-md-4">
+              <label class="form-label">First Name</label>
               <input name="first_name" class="form-control">
             </div>
-            <div class="col">
-              <label class="form-label">Middle name</label>
+            <div class="col-md-4">
+              <label class="form-label">Middle Name</label>
               <input name="middle_name" class="form-control">
             </div>
-            <div class="col">
-              <label class="form-label">Last name</label>
+            <div class="col-md-4">
+              <label class="form-label">Last Name</label>
               <input name="last_name" class="form-control">
             </div>
           </div>
-          <div class="mb-2 mt-2">
-            <label class="form-label">Position</label>
-            <input name="position" class="form-control">
-          </div>
+          
+          <!-- 4. Role -->
           <div class="mb-2">
-            <label class="form-label">Department</label>
-            <select name="department" id="departmentSelect" class="form-select">
+            <label class="form-label">Role <span class="text-danger">*</span></label>
+            <select name="role" id="addUserRole" class="form-select" onchange="toggleOrgFields()" required <?php echo $is_area_manager ? 'disabled' : ''; ?>>
+              <?php if ($is_area_manager): ?>
+                <option value="store_supervisor" selected>Store Supervisor</option>
+              <?php else: ?>
+                <option value="">-- Select Role --</option>
+                <option value="borrower">Borrower/Staff</option>
+                <option value="store_supervisor">Store Supervisor</option>
+                <option value="area_manager">Area Manager</option>
+                <option value="admin">Admin</option>
+              <?php endif; ?>
+            </select>
+            <?php if ($is_area_manager): ?>
+              <input type="hidden" name="role" value="store_supervisor">
+            <?php endif; ?>
+          </div>
+          
+          <!-- Conditional: Area field (only for Area Manager role) -->
+          <div class="mb-2" id="addUserAreaRow" style="display:none;">
+            <label class="form-label">Assigned Area <span class="text-danger">*</span></label>
+            <select name="area_id" id="addUserAreaSelect" class="form-select">
+              <option value="">-- Select Area --</option>
+            </select>
+          </div>
+          
+          <!-- 5. Department (auto-set for area_manager/store_supervisor) -->
+          <div class="mb-2">
+            <label class="form-label">Department <span class="text-danger">*</span></label>
+            <select name="department" id="departmentSelect" class="form-select" required>
+              <option value="">-- Select Department --</option>
               <option value="HR">HR</option>
               <option value="RSQM">RSQM</option>
               <option value="OPERATION">OPERATION</option>
@@ -406,12 +429,16 @@ $users = $stmt->fetchAll();
               <option value="ADMIN">ADMIN</option>
             </select>
           </div>
-          <div class="mb-2" id="storeRow" style="display:none;">
-            <label class="form-label">Store</label>
-            <input name="store" class="form-control">
-          </div>
+          
+          <!-- 6. Position -->
           <div class="mb-2">
-            <label class="form-label">Region</label>
+            <label class="form-label">Position</label>
+            <input name="position" class="form-control">
+          </div>
+          
+          <!-- 7. Region -->
+          <div class="mb-2">
+            <label class="form-label">Region <span class="text-danger">*</span></label>
             <select name="region" class="form-select" required>
               <option value="">-- Select Region --</option>
               <option value="NCR">NCR - National Capital Region</option>
@@ -433,60 +460,22 @@ $users = $stmt->fetchAll();
               <option value="BARMM">BARMM - Bangsamoro</option>
             </select>
           </div>
+          
+          <!-- 8. Email -->
           <div class="mb-2">
-            <label class="form-label">Email</label>
+            <label class="form-label">Email <span class="text-danger">*</span></label>
             <input name="email" type="email" class="form-control" required>
           </div>
+          
+          <!-- 9. Password -->
           <div class="mb-2">
-            <label class="form-label">Password</label>
+            <label class="form-label">Password <span class="text-danger">*</span></label>
             <input name="password" type="password" class="form-control" required>
           </div>
-          <div class="mb-2">
-            <label class="form-label">Role</label>
-            <select name="role" id="addUserRole" class="form-select" onchange="toggleOrgFields()" <?php echo $is_area_manager ? 'disabled' : ''; ?>>
-              <?php if ($is_area_manager): ?>
-                <option value="store_supervisor" selected>Store Supervisor</option>
-              <?php else: ?>
-                <option value="borrower">Borrower/Staff</option>
-                <option value="store_supervisor">Store Supervisor</option>
-                <option value="area_manager">Area Manager</option>
-                <option value="admin">Admin</option>
-              <?php endif; ?>
-            </select>
-            <?php if ($is_area_manager): ?>
-              <input type="hidden" name="role" value="store_supervisor">
-            <?php endif; ?>
-          </div>
           
-          <!-- Area field for Area Managers -->
-          <div class="mb-2" id="addUserAreaRow" style="<?php echo $is_admin ? 'display:none;' : 'display:none;'; ?>">
-            <label class="form-label">Assigned Area</label>
-            <select name="area_id" id="addUserAreaSelect" class="form-select">
-              <option value="">-- Select Area --</option>
-            </select>
-          </div>
-          
-          <!-- Store field for Store Supervisors -->
-          <div class="mb-2" id="addUserStoreRow" style="<?php echo $is_area_manager ? 'display:block;' : 'display:none;'; ?>">
-            <label class="form-label">Assigned Store <span class="text-danger">*</span></label>
-            <select name="store_id" id="addUserStoreSelect" class="form-select" <?php echo $is_area_manager ? 'required' : ''; ?>>
-              <option value="">-- Select Store --</option>
-            </select>
-            <?php if ($is_area_manager): ?>
-              <small class="text-muted">Only stores in your area are shown</small>
-            <?php endif; ?>
-          </div>
-          
-          <!-- Manager field (hidden, auto-set to current area manager) -->
+          <!-- Hidden field for area managers creating supervisors -->
           <?php if ($is_area_manager): ?>
             <input type="hidden" name="managed_by_user_id" value="<?php echo $current_user['id']; ?>">
-          <?php else: ?>
-          <div class="mb-2" id="addUserManagerRow" style="display:none;">
-            <label class="form-label">Reports To</label>
-            <select name="managed_by_user_id" id="addUserManagerSelect" class="form-select">
-              <option value="">-- Select Manager --</option>
-            </select>
-          </div>
           <?php endif; ?>
         </div>
         <div class="modal-footer">
@@ -765,10 +754,36 @@ $users = $stmt->fetchAll();
 
   function toggleOrgFields() {
     const role = document.getElementById('addUserRole').value;
+    const departmentSelect = document.getElementById('departmentSelect');
+    const areaRow = document.getElementById('addUserAreaRow');
     
-    document.getElementById('addUserAreaRow').style.display = role === 'area_manager' ? 'block' : 'none';
-    document.getElementById('addUserStoreRow').style.display = role === 'store_supervisor' ? 'block' : 'none';
-    document.getElementById('addUserManagerRow').style.display = (role === 'store_supervisor' || role === 'area_manager') ? 'block' : 'none';
+    // Reset visibility
+    areaRow.style.display = 'none';
+    
+    // Handle role-specific logic
+    if (role === 'area_manager') {
+      // Show area dropdown for area manager
+      areaRow.style.display = 'block';
+      // Auto-set department to OPERATION and disable
+      departmentSelect.value = 'OPERATION';
+      departmentSelect.disabled = true;
+      
+    } else if (role === 'store_supervisor') {
+      // Hide area and store for store supervisor (assigned later by area manager)
+      areaRow.style.display = 'none';
+      // Auto-set department to OPERATION and disable
+      departmentSelect.value = 'OPERATION';
+      departmentSelect.disabled = true;
+      
+    } else if (role === 'borrower') {
+      // Staff/Borrower - no additional fields
+      departmentSelect.disabled = false;
+      departmentSelect.value = '';
+      
+    } else {
+      // Default case (empty selection or admin)
+      departmentSelect.disabled = false;
+    }
   }
 
   function toggleEditOrgFields() {
@@ -776,7 +791,6 @@ $users = $stmt->fetchAll();
     
     document.getElementById('editUserAreaRow').style.display = role === 'area_manager' ? 'block' : 'none';
     document.getElementById('editUserStoreRow').style.display = role === 'store_supervisor' ? 'block' : 'none';
-    document.getElementById('editUserManagerRow').style.display = (role === 'store_supervisor' || role === 'area_manager') ? 'block' : 'none';
   }
   </script>
   

@@ -27,17 +27,27 @@ $department = trim($_POST['department'] ?? '');
 $store = trim($_POST['store'] ?? '');
 $region = trim($_POST['region'] ?? '');
 
+// Auto-set department for area_manager and store_supervisor roles
+if ($role === 'area_manager' || $role === 'store_supervisor') {
+  $department = 'OPERATION';
+}
+
 // If area manager is creating user, force role to store_supervisor
 if ($is_area_manager) {
   $role = 'store_supervisor';
+  $department = 'OPERATION';
   $managed_by_user_id = $current_user['id'];
   
-  // Validate store belongs to their area
+  // For store supervisors created by area managers:
+  // - store_id comes from the form (area manager selects it)
+  // - area_id should match the area manager's area
+  $area_id = $current_user['area_id'];
+  
+  // Validate store belongs to their area if store is selected
   if ($store_id) {
     $storeCheck = $pdo->prepare('SELECT s.store_id FROM stores s 
-                                  JOIN users u ON u.id = ? 
-                                  WHERE s.store_id = ? AND s.area_id = u.area_id');
-    $storeCheck->execute([$current_user['id'], $store_id]);
+                                  WHERE s.store_id = ? AND s.area_id = ?');
+    $storeCheck->execute([$store_id, $current_user['area_id']]);
     if (!$storeCheck->fetch()) {
       $_SESSION['flash_error'] = 'You can only assign supervisors to stores in your area';
       header('Location: users.php'); exit;
