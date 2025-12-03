@@ -48,16 +48,13 @@ require_once __DIR__ . '/config.php';
       <i class="fas fa-store"></i> Stores
     </button>
   </li>
+  <?php if (user_has_role('admin')): ?>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="areas-tab" data-bs-toggle="tab" data-bs-target="#areas-pane" type="button" role="tab">
       <i class="fas fa-map-marked-alt"></i> Areas
     </button>
   </li>
-  <li class="nav-item" role="presentation">
-    <button class="nav-link" id="packages-tab" data-bs-toggle="tab" data-bs-target="#packages-pane" type="button" role="tab">
-      <i class="fas fa-box"></i> Release Packages
-    </button>
-  </li>
+  <?php endif; ?>
 </ul>
 
 <div class="tab-content" id="storesTabsContent">
@@ -67,11 +64,9 @@ require_once __DIR__ . '/config.php';
     <div class="card shadow-sm">
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0">All Stores</h5>
-        <?php if (user_has_role('admin')): ?>
-          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStoreModal">
-            <i class="fas fa-plus"></i> Add Store
-          </button>
-        <?php endif; ?>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStoreModal">
+          <i class="fas fa-plus"></i> Add Store
+        </button>
       </div>
       <div class="card-body">
         <div id="storesTableContainer">
@@ -108,24 +103,6 @@ require_once __DIR__ . '/config.php';
     </div>
   </div>
 
-  <!-- PACKAGES TAB -->
-  <div class="tab-pane fade" id="packages-pane" role="tabpanel">
-    <div class="card shadow-sm">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Equipment Release Packages</h5>
-        <?php if (user_has_role('admin')): ?>
-          <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createPackageModal">
-            <i class="fas fa-plus"></i> Create Package
-          </button>
-        <?php endif; ?>
-      </div>
-      <div class="card-body">
-        <div class="alert alert-info">
-          <i class="fas fa-info-circle"></i> Package management system coming soon...
-        </div>
-      </div>
-    </div>
-  </div>
 
 </div>
 

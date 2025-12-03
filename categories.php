@@ -113,26 +113,22 @@ foreach ($rows as $r) {
           </div>
 
           <div class="mb-4">
-            <label class="form-label fw-semibold">Standard Modifiers</label>
+            <label class="form-label fw-semibold">Available Modifiers</label>
             <p class="small text-muted mb-2">Select the fields you want to track for this category</p>
-            <div class="d-flex flex-wrap gap-2">
-              <?php
-              $standard = ['S/N','MODEL','IP','MAC','RAM','CPU','IMEI-1','IMEI-2'];
-              foreach ($standard as $s):
-              ?>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" name="modifiers[]" value="<?php echo e($s); ?>" id="mod_<?php echo e($s); ?>">
-                  <label class="form-check-label" for="mod_<?php echo e($s); ?>"><?php echo e($s); ?></label>
+            <div id="availableModifiersContainer">
+              <div class="text-center py-2">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Loading...</span>
                 </div>
-              <?php endforeach; ?>
+              </div>
             </div>
           </div>
 
           <div class="mb-3">
-            <label class="form-label fw-semibold">Custom Modifiers</label>
-            <p class="small text-muted mb-2">Add any additional fields specific to this category</p>
+            <label class="form-label fw-semibold">Custom Modifier</label>
+            <p class="small text-muted mb-2">Add a new modifier if it doesn't exist above (e.g. Quantity, Warranty Expiry)</p>
             <div class="input-group">
-              <input id="customModInput" class="form-control" placeholder="e.g. Warranty Expiry, Purchase Date">
+              <input id="customModInput" class="form-control" placeholder="e.g. QUANTITY, WARRANTY">
               <button class="btn btn-outline-primary" type="button" id="addCustomModBtn">+ Add</button>
             </div>
             <div id="customMods" class="mt-3"></div>
@@ -156,12 +152,7 @@ foreach ($rows as $r) {
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p class="text-muted">Manage all modifiers used across categories. Changes here will affect all categories using these modifiers.</p>
-          <div class="mb-3">
-            <button class="btn btn-success" onclick="openAddModifierModal()">
-              <i class="fas fa-plus"></i> Add New Modifier
-            </button>
-          </div>
+          <p class="text-muted">Manage all modifiers used across categories.</p>
           <div id="modifiersListContainer">
             <div class="text-center py-4">
               <div class="spinner-border text-primary" role="status">
@@ -172,6 +163,9 @@ foreach ($rows as $r) {
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-success" onclick="openAddModifierModal()">
+            <i class="fas fa-plus"></i> Add Modifier
+          </button>
         </div>
       </div>
     </div>
@@ -215,28 +209,15 @@ foreach ($rows as $r) {
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label for="newModifierLabel" class="form-label">Modifier Label</label>
-            <input type="text" class="form-control" id="newModifierLabel" placeholder="e.g. STORAGE, SCREEN SIZE">
-          </div>
-          <div class="mb-3">
-            <label for="newModifierCategories" class="form-label">Assign to Categories</label>
-            <div id="newModifierCategories" class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
-              <div class="text-center py-2">
-                <div class="spinner-border spinner-border-sm text-primary" role="status">
-                  <span class="visually-hidden">Loading categories...</span>
-                </div>
-              </div>
-            </div>
-            <small class="text-muted">Select which categories should use this modifier</small>
-          </div>
-          <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i> <small>This modifier will be available for all selected categories.</small>
+            <label for="newModifierLabel" class="form-label">Modifier Label <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="newModifierLabel" placeholder="e.g. STORAGE, SCREEN SIZE, IMEI">
+            <small class="text-muted">This modifier will be available for all categories to use.</small>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-success" onclick="saveNewModifier()">
-            <i class="fas fa-plus"></i> Add Modifier
+          <button type="button" class="btn btn-primary" onclick="saveNewModifier()">
+            <i class="fas fa-save"></i> Save Modifier
           </button>
         </div>
       </div>
@@ -246,6 +227,40 @@ foreach ($rows as $r) {
 <?php include 'dashboard_nav_wrapper_end.php'; ?>
 
 <script>
+    // Load available modifiers when Add Category modal is shown
+    document.getElementById('addCategoryModal').addEventListener('show.bs.modal', function() {
+      loadAvailableModifiers();
+    });
+
+    function loadAvailableModifiers() {
+      const container = document.getElementById('availableModifiersContainer');
+      container.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+      
+      fetch('get_all_modifiers.php')
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.modifiers.length > 0) {
+            let html = '<div class="d-flex flex-wrap gap-2">';
+            data.modifiers.forEach(modifier => {
+              const id = 'mod_' + modifier.id;
+              html += `
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="modifiers[]" value="${escapeHtml(modifier.label)}" id="${id}">
+                  <label class="form-check-label" for="${id}">${escapeHtml(modifier.label)}</label>
+                </div>
+              `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+          } else {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No modifiers available. Add a custom modifier below.</div>';
+          }
+        })
+        .catch(error => {
+          container.innerHTML = '<div class="alert alert-danger">Error loading modifiers</div>';
+        });
+    }
+
     // Load modifiers when Edit Modifiers modal is shown
     document.getElementById('editModifiersModal').addEventListener('show.bs.modal', function() {
       loadAllModifiers();
@@ -271,12 +286,13 @@ foreach ($rows as $r) {
                   <div class="d-flex justify-content-between align-items-center">
                     <div>
                       <strong>${escapeHtml(modifier.label)}</strong>
-                      <small class="text-muted d-block">Key: ${escapeHtml(modifier.key_name)}</small>
-                      <small class="text-muted">Used in: ${escapeHtml(modifier.categories)}</small>
                     </div>
-                    <div>
-                      <button class="btn btn-sm btn-outline-primary" onclick="editModifier(${modifier.id}, '${escapeHtml(modifier.label)}')">
-                        <i class="fas fa-edit"></i> Edit
+                    <div class="btn-group">
+                      <button class="btn btn-sm btn-outline-primary" onclick="editModifier(${modifier.id}, '${escapeHtml(modifier.label).replace(/'/g, "\\'")}')">
+                        ✏️ Edit
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" onclick="deleteModifier(${modifier.id}, '${escapeHtml(modifier.label).replace(/'/g, "\\'")}')">
+                        🗑️ Delete
                       </button>
                     </div>
                   </div>
@@ -357,53 +373,14 @@ foreach ($rows as $r) {
       document.getElementById('editModifiersModal').addEventListener('hidden.bs.modal', function() {
         const addModal = new bootstrap.Modal(document.getElementById('addNewModifierModal'));
         addModal.show();
-        
-        // Load categories
-        loadCategoriesForModifier();
       }, { once: true });
-    }
-
-    function loadCategoriesForModifier() {
-      const container = document.getElementById('newModifierCategories');
-      container.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
-      
-      fetch('get_categories_list.php')
-        .then(response => response.json())
-        .then(data => {
-          if (data.success && data.categories.length > 0) {
-            let html = '';
-            data.categories.forEach(cat => {
-              html += `
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="${cat.id}" id="cat_${cat.id}" name="category_ids[]">
-                  <label class="form-check-label" for="cat_${cat.id}">
-                    ${escapeHtml(cat.name)}
-                  </label>
-                </div>
-              `;
-            });
-            container.innerHTML = html;
-          } else {
-            container.innerHTML = '<div class="alert alert-info">No categories available</div>';
-          }
-        })
-        .catch(error => {
-          container.innerHTML = '<div class="alert alert-danger">Error loading categories</div>';
-        });
     }
 
     function saveNewModifier() {
       const label = document.getElementById('newModifierLabel').value.trim();
-      const checkboxes = document.querySelectorAll('#newModifierCategories input[type="checkbox"]:checked');
-      const categoryIds = Array.from(checkboxes).map(cb => cb.value);
       
       if (!label) {
         alert('Modifier label cannot be empty');
-        return;
-      }
-      
-      if (categoryIds.length === 0) {
-        alert('Please select at least one category');
         return;
       }
       
@@ -411,8 +388,7 @@ foreach ($rows as $r) {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          label: label,
-          category_ids: categoryIds
+          label: label
         })
       })
       .then(response => response.json())
@@ -439,6 +415,30 @@ foreach ($rows as $r) {
       })
       .catch(error => {
         alert('Error adding modifier');
+      });
+    }
+
+    function deleteModifier(id, label) {
+      if (!confirm(`Are you sure you want to delete modifier "${label}"? This will remove it from all categories using it.`)) {
+        return;
+      }
+      
+      fetch('delete_modifier.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'id=' + id
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert('Modifier deleted successfully!');
+          loadAllModifiers();
+        } else {
+          alert('Error: ' + data.message);
+        }
+      })
+      .catch(error => {
+        alert('Error deleting modifier');
       });
     }
 

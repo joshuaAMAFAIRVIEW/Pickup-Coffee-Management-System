@@ -19,6 +19,14 @@ if ($name === '') {
 
 $pdo = $GLOBALS['pdo'];
 try {
+  // Check if category name already exists
+  $stmt = $pdo->prepare('SELECT COUNT(*) FROM categories WHERE name = :name');
+  $stmt->execute([':name'=>$name]);
+  if ($stmt->fetchColumn() > 0) {
+    $_SESSION['error_message'] = 'Category "' . htmlspecialchars($name) . '" already exists. Please use a different name.';
+    header('Location: categories.php'); exit;
+  }
+
   $pdo->beginTransaction();
   $stmt = $pdo->prepare('INSERT INTO categories (name) VALUES (:name)');
   $stmt->execute([':name'=>$name]);
@@ -34,9 +42,11 @@ try {
     $ins->execute([':cid'=>$catId,':label'=>$label,':key'=>$key,':pos'=>$pos++]);
   }
   $pdo->commit();
-  $_SESSION['flash_success'] = 'Category created';
+  $_SESSION['success_message'] = 'Category "' . htmlspecialchars($name) . '" created successfully!';
 } catch (Exception $e) {
-  $pdo->rollBack();
-  $_SESSION['flash_error'] = 'Error creating category: '. $e->getMessage();
+  if ($pdo->inTransaction()) {
+    $pdo->rollBack();
+  }
+  $_SESSION['error_message'] = 'Error creating category: '. $e->getMessage();
 }
 header('Location: categories.php'); exit;

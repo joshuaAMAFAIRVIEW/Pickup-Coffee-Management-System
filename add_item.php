@@ -29,10 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $attrs = $_POST['attr'] ?? [];
     if (!is_array($attrs)) $attrs = [];
     $attributes_json = json_encode($attrs);
+    
+    // Get quantity (default to 1 for items without quantity tracking)
+    $quantity = isset($_POST['quantity']) ? max(1, (int)$_POST['quantity']) : 1;
+    
     try {
       if ($hasItemsTable) {
-        $ins = $pdo->prepare('INSERT INTO items (category_id, display_name, attributes, assigned_user_id) VALUES (:cid, :name, :attrs, NULL)');
-        $ins->execute([':cid'=>$category_id,':name'=>$display_name,':attrs'=>$attributes_json]);
+        $ins = $pdo->prepare('INSERT INTO items (category_id, display_name, attributes, total_quantity, available_quantity, assigned_user_id) VALUES (:cid, :name, :attrs, :qty, :qty, NULL)');
+        $ins->execute([':cid'=>$category_id,':name'=>$display_name,':attrs'=>$attributes_json,':qty'=>$quantity]);
       } else {
         // legacy fallback: insert into `inventory` table. create a generated SKU.
         $sku = 'LEG-' . time();
@@ -81,6 +85,11 @@ $cats = $pdo->query('SELECT id,name FROM categories ORDER BY name')->fetchAll(PD
         <div class="mb-3">
           <label class="form-label">Item Name</label>
           <input name="name" class="form-control" required value="<?php echo isset($display_name)?e($display_name):''; ?>">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Quantity <small class="text-muted">(Optional - for bulk items like flash drives)</small></label>
+          <input type="number" name="quantity" class="form-control" min="1" value="1" placeholder="Enter quantity (default: 1)">
+          <small class="text-muted">For individual items (laptop, tablet), leave as 1. For bulk items (flash drives), enter total quantity.</small>
         </div>
         <div class="d-grid">
           <button class="btn btn-primary">Create Item</button>

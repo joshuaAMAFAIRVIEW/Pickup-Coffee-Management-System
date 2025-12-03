@@ -45,20 +45,57 @@ $user = $_SESSION['user'];
           <a class="list-group-item list-group-item-action" data-bs-toggle="collapse" href="#inventorySub" role="button" aria-expanded="false" aria-controls="inventorySub">Inventory</a>
         <div class="collapse" id="inventorySub">
           <a href="inventory.php" class="list-group-item list-group-item-action ps-4">Items</a>
-          <a href="add_item.php" class="list-group-item list-group-item-action ps-4">Add Item</a>
-          <a href="categories.php" class="list-group-item list-group-item-action ps-4">Categories</a>
+          <?php if (isset($user['role']) && !in_array($user['role'], ['area_manager', 'store_supervisor'])): ?>
+            <a href="add_item.php" class="list-group-item list-group-item-action ps-4">Add Item</a>
+            <a href="categories.php" class="list-group-item list-group-item-action ps-4">Categories</a>
+          <?php endif; ?>
         </div>
         <a href="accountability.php" class="list-group-item list-group-item-action">Release/Return</a>
         <a href="#" class="list-group-item list-group-item-action">Reports</a>
+        <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
+          <a href="activity_logs.php" class="list-group-item list-group-item-action">Activity Logs</a>
+        <?php endif; ?>
         <?php if (isset($user['role']) && in_array($user['role'], ['admin', 'area_manager'])): ?>
           <a href="stores.php" class="list-group-item list-group-item-action">Stores</a>
         <?php endif; ?>
         <?php if (isset($user['role']) && $user['role'] === 'area_manager'): ?>
           <a href="manage_team.php" class="list-group-item list-group-item-action">Manage Team</a>
+          <a href="area_manager_requests.php" class="list-group-item list-group-item-action">
+            Requests
+            <?php
+            // Get responded requests count (accepted or declined)
+            $req_stmt = $pdo->prepare('SELECT COUNT(*) FROM supervisor_assignment_requests WHERE area_manager_id = ? AND status != ?');
+            $req_stmt->execute([$user['id'], 'pending']);
+            $response_count = $req_stmt->fetchColumn();
+            if ($response_count > 0):
+            ?>
+              <span class="badge bg-info rounded-pill float-end"><?php echo $response_count; ?></span>
+            <?php endif; ?>
+          </a>
           <a href="supervisor_movements.php" class="list-group-item list-group-item-action">Supervisor Movements</a>
         <?php endif; ?>
         <?php if (isset($user['role']) && $user['role'] === 'store_supervisor'): ?>
           <a href="my_store.php" class="list-group-item list-group-item-action">My Store</a>
+          <a href="supervisor_notifications.php" class="list-group-item list-group-item-action">
+            Requests
+            <?php
+            // Get pending notifications count
+            $notif_stmt = $pdo->prepare('SELECT COUNT(*) FROM supervisor_assignment_requests WHERE supervisor_user_id = ? AND status = ?');
+            $notif_stmt->execute([$user['id'], 'pending']);
+            $pending_count = $notif_stmt->fetchColumn();
+            
+            // Get unread removal notifications count
+            $removal_stmt = $pdo->prepare('SELECT COUNT(*) FROM supervisor_removal_notifications WHERE supervisor_user_id = ? AND is_read = 0');
+            $removal_stmt->execute([$user['id']]);
+            $unread_removals = $removal_stmt->fetchColumn();
+            
+            $total_notifications = $pending_count + $unread_removals;
+            
+            if ($total_notifications > 0):
+            ?>
+              <span class="badge bg-danger rounded-pill float-end"><?php echo $total_notifications; ?></span>
+            <?php endif; ?>
+          </a>
           <a href="supervisor_movements.php" class="list-group-item list-group-item-action">My Movement History</a>
         <?php endif; ?>
         <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>

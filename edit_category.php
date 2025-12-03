@@ -92,21 +92,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="mb-4">
-                    <label class="form-label fw-semibold">Standard Modifiers</label>
+                    <label class="form-label fw-semibold">Available Modifiers</label>
                     <p class="small text-muted mb-2">Select the fields you want to track for this category</p>
-                    <div class="d-flex flex-wrap gap-2">
-                        <?php
-                        $standard = ['S/N','MODEL','IP','MAC','RAM','CPU','IMEI-1','IMEI-2'];
-                        $existingModLabels = array_column($modifiers, 'label');
-                        foreach ($standard as $s):
-                            $checked = in_array($s, $existingModLabels) ? 'checked' : '';
-                        ?>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" name="modifiers[]" value="<?php echo e($s); ?>" id="mod_<?php echo e($s); ?>" <?php echo $checked; ?>>
-                                <label class="form-check-label" for="mod_<?php echo e($s); ?>"><?php echo e($s); ?></label>
+                    <div id="availableModifiersContainer">
+                        <div class="text-center py-2">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
                             </div>
-                        <?php endforeach; ?>
+                        </div>
                     </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Custom Modifier</label>
+                    <p class="small text-muted mb-2">Add a new modifier if it doesn't exist above (e.g. Quantity, Warranty Expiry)</p>
+                    <div class="input-group">
+                        <input id="customModInput" class="form-control" placeholder="e.g. QUANTITY, WARRANTY">
+                        <button class="btn btn-outline-primary" type="button" id="addCustomModBtn">+ Add</button>
+                    </div>
+                    <div id="customMods" class="mt-3"></div>
                 </div>
 
                 <div class="d-flex gap-2">
@@ -149,3 +153,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <?php include 'dashboard_nav_wrapper_end.php'; ?>
+
+<script>
+    const existingModLabels = <?php echo json_encode(array_column($modifiers, 'label')); ?>;
+
+    // Load available modifiers on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        loadAvailableModifiers();
+    });
+
+    function loadAvailableModifiers() {
+        const container = document.getElementById('availableModifiersContainer');
+        container.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+        
+        fetch('get_all_modifiers.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.modifiers.length > 0) {
+                    let html = '<div class="d-flex flex-wrap gap-2">';
+                    data.modifiers.forEach(modifier => {
+                        const id = 'mod_' + modifier.id;
+                        const checked = existingModLabels.includes(modifier.label) ? 'checked' : '';
+                        html += `
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="modifiers[]" value="${escapeHtml(modifier.label)}" id="${id}" ${checked}>
+                                <label class="form-check-label" for="${id}">${escapeHtml(modifier.label)}</label>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No modifiers available. Add a custom modifier below.</div>';
+                }
+            })
+            .catch(error => {
+                container.innerHTML = '<div class="alert alert-danger">Error loading modifiers</div>';
+            });
+    }
+
+    function escapeHtml(text) {
+        const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'};
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // Custom modifier functionality
+    document.getElementById('addCustomModBtn').addEventListener('click', function() {
+        const input = document.getElementById('customModInput');
+        const v = input.value.trim();
+        if (!v) {
+            alert('Please enter a modifier name');
+            return;
+        }
+        
+        const id = 'custom_' + Date.now();
+        const div = document.createElement('div');
+        div.className = 'form-check';
+        div.innerHTML = '<input class="form-check-input" type="checkbox" name="modifiers[]" value="' + escapeHtml(v) + '" id="' + id + '" checked> <label class="form-check-label" for="' + id + '">' + escapeHtml(v) + '</label>';
+        document.getElementById('customMods').appendChild(div);
+        input.value = '';
+    });
+</script>
+</body>
+</html>

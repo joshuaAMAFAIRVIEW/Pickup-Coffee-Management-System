@@ -15,13 +15,13 @@ $pdo = $GLOBALS['pdo'];
 try {
     $stmt = $pdo->query('
         SELECT 
-            cm.id,
+            MIN(cm.id) as id,
             cm.label,
             cm.key_name,
-            GROUP_CONCAT(c.name SEPARATOR ", ") as categories
+            GROUP_CONCAT(DISTINCT c.name SEPARATOR ", ") as categories
         FROM category_modifiers cm
         LEFT JOIN categories c ON cm.category_id = c.id
-        GROUP BY cm.id, cm.label, cm.key_name
+        GROUP BY cm.label, cm.key_name
         ORDER BY cm.label
     ');
     $modifiers = $stmt->fetchAll();

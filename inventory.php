@@ -14,6 +14,8 @@ $sql = "SELECT
     i.id,
     i.display_name,
     i.attributes,
+    i.total_quantity,
+    i.available_quantity,
     i.status,
     i.item_condition,
     i.created_at,
@@ -50,6 +52,16 @@ if ($department_filter !== '') {
 if ($status_filter !== '') {
     $sql .= " AND i.status = :status";
     $params[':status'] = $status_filter;
+}
+
+// Area Manager: Only see items from stores in their area
+if ($user['role'] === 'area_manager' && !empty($user['area_id'])) {
+    $sql .= " AND EXISTS (
+        SELECT 1 FROM store_item_assignments sia
+        INNER JOIN stores s ON sia.store_id = s.store_id
+        WHERE sia.item_id = i.id AND s.area_id = :area_id
+    )";
+    $params[':area_id'] = $user['area_id'];
 }
 
 $sql .= " ORDER BY i.created_at DESC";
@@ -194,6 +206,7 @@ $departments = $pdo->query('SELECT DISTINCT department FROM users WHERE departme
               <tr>
                 <th>Item Name</th>
                 <th>Category</th>
+                <th>Qty</th>
                 <th>S/N</th>
                 <th>Condition</th>
                 <th>Status</th>
@@ -205,7 +218,7 @@ $departments = $pdo->query('SELECT DISTINCT department FROM users WHERE departme
             </thead>
             <tbody>
               <?php if (!$items): ?>
-                <tr><td colspan="9" class="text-muted text-center py-4">
+                <tr><td colspan="10" class="text-muted text-center py-4">
                   <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
                   No items found. Add items from the "Add Item" page.
                 </td></tr>
@@ -235,6 +248,15 @@ $departments = $pdo->query('SELECT DISTINCT department FROM users WHERE departme
                     <span class="badge bg-light text-dark border">
                       <?php echo htmlspecialchars($item['category_name'] ?? 'N/A'); ?>
                     </span>
+                  </td>
+                  <td>
+                    <?php if ($item['total_quantity'] > 1): ?>
+                      <span class="badge bg-primary" title="<?php echo $item['available_quantity']; ?> available out of <?php echo $item['total_quantity']; ?>">
+                        <?php echo $item['available_quantity']; ?>/<?php echo $item['total_quantity']; ?>
+                      </span>
+                    <?php else: ?>
+                      <span class="text-muted">-</span>
+                    <?php endif; ?>
                   </td>
                   <td><code><?php echo htmlspecialchars($serial); ?></code></td>
                   <td>
