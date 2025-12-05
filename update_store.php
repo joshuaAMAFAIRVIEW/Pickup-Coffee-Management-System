@@ -18,6 +18,7 @@ $store_code = trim($_POST['store_code'] ?? '');
 $area_id = $_POST['area_id'] ?? null;
 $address = trim($_POST['address'] ?? '');
 $contact_person = trim($_POST['contact_person'] ?? '');
+$contact_employee_number = trim($_POST['contact_employee_number'] ?? '');
 $contact_number = trim($_POST['contact_number'] ?? '');
 $opening_date = $_POST['opening_date'] ?? null;
 $is_active = isset($_POST['is_active']) ? (int)$_POST['is_active'] : 1;
@@ -52,6 +53,7 @@ try {
             area_id = ?, 
             address = ?, 
             contact_person = ?, 
+            contact_employee_number = ?,
             contact_number = ?, 
             opening_date = ?,
             is_active = ?
@@ -63,6 +65,7 @@ try {
         $area_id ?: null,
         $address ?: null,
         $contact_person ?: null,
+        $contact_employee_number ?: null,
         $contact_number ?: null,
         $opening_date ?: null,
         $is_active,

@@ -22,6 +22,7 @@ $search = trim($_GET['search'] ?? '');
 // Build query with search (include area and store info)
 if ($search !== '') {
     $stmt = $pdo->prepare('SELECT u.id, u.username, u.employee_number, u.role, u.created_at, u.first_name, u.last_name, u.department,
+                           u.area_id, u.store_id, u.mobile_number,
                            a.area_name, s.store_name, s.store_code
                            FROM users u
                            LEFT JOIN areas a ON u.area_id = a.area_id
@@ -40,6 +41,7 @@ if ($search !== '') {
     $stmt->execute($params);
 } else {
     $query = 'SELECT u.id, u.username, u.employee_number, u.role, u.created_at, u.first_name, u.last_name, u.department,
+                         u.area_id, u.store_id, u.mobile_number,
                          a.area_name, s.store_name, s.store_code
                          FROM users u
                          LEFT JOIN areas a ON u.area_id = a.area_id
@@ -158,7 +160,8 @@ $users = $stmt->fetchAll();
                      data-user-firstname="<?php echo htmlspecialchars($u['first_name'] ?? ''); ?>"
                      data-user-lastname="<?php echo htmlspecialchars($u['last_name'] ?? ''); ?>"
                      data-user-department="<?php echo htmlspecialchars($u['department'] ?? ''); ?>"
-                     data-user-role="<?php echo htmlspecialchars($u['role']); ?>">
+                     data-user-role="<?php echo htmlspecialchars($u['role']); ?>"
+                     data-user-mobile="<?php echo htmlspecialchars($u['mobile_number'] ?? ''); ?>">
                     <?php echo htmlspecialchars($u['username']); ?>
                   </a>
                 </td>
@@ -198,8 +201,11 @@ $users = $stmt->fetchAll();
                             data-user-empnum="<?php echo htmlspecialchars($u['employee_number'] ?? ''); ?>"
                             data-user-firstname="<?php echo htmlspecialchars($u['first_name'] ?? ''); ?>"
                             data-user-lastname="<?php echo htmlspecialchars($u['last_name'] ?? ''); ?>"
+                            data-user-mobile="<?php echo htmlspecialchars($u['mobile_number'] ?? ''); ?>"
                             data-user-department="<?php echo htmlspecialchars($u['department'] ?? ''); ?>"
                             data-user-role="<?php echo htmlspecialchars($u['role']); ?>"
+                            data-user-area-id="<?php echo isset($u['area_id']) ? (int)$u['area_id'] : ''; ?>"
+                            data-user-store-id="<?php echo isset($u['store_id']) ? (int)$u['store_id'] : ''; ?>"
                             title="Edit User">
                       <i class="fas fa-edit"></i>
                     </button>
@@ -257,6 +263,11 @@ $users = $stmt->fetchAll();
             <div class="col-md-6">
               <label class="form-label">Last Name</label>
               <input name="last_name" id="editLastName" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Mobile Number</label>
+              <input name="mobile_number" id="editMobileNumber" class="form-control" placeholder="e.g., 09171234567">
+              <small class="text-muted">For Viber contact feature</small>
             </div>
             <div class="col-md-6">
               <label class="form-label">Department</label>
@@ -507,13 +518,20 @@ $users = $stmt->fetchAll();
                   <strong>Name:</strong><br>
                   <span id="detailFullName"></span>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                   <strong>Department:</strong><br>
                   <span id="detailDepartment"></span>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                   <strong>Role:</strong><br>
                   <span id="detailRole" class="badge bg-primary"></span>
+                </div>
+                <div class="col-md-2">
+                  <strong>Contact:</strong><br>
+                  <span id="detailMobile"></span>
+                  <a href="#" id="detailViberBtn" class="btn btn-sm btn-outline-primary ms-2" style="display: none;" title="Message on Viber" target="_blank">
+                    <i class="fab fa-viber"></i>
+                  </a>
                 </div>
               </div>
             </div>
@@ -792,6 +810,54 @@ $users = $stmt->fetchAll();
     document.getElementById('editUserAreaRow').style.display = role === 'area_manager' ? 'block' : 'none';
     document.getElementById('editUserStoreRow').style.display = role === 'store_supervisor' ? 'block' : 'none';
   }
+  
+  async function loadEditAreas(currentAreaId) {
+    try {
+      const response = await fetch('get_areas.php');
+      const data = await response.json();
+      
+      if (data.success && data.areas) {
+        const select = document.getElementById('editUserAreaSelect');
+        select.innerHTML = '<option value="">-- Select Area --</option>';
+        
+        data.areas.forEach(area => {
+          const option = document.createElement('option');
+          option.value = area.area_id;
+          option.textContent = area.area_name;
+          if (currentAreaId && area.area_id == currentAreaId) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading areas:', error);
+    }
+  }
+  
+  async function loadEditStores(currentStoreId) {
+    try {
+      const response = await fetch('get_all_stores.php');
+      const data = await response.json();
+      
+      if (data.success && data.stores) {
+        const select = document.getElementById('editUserStoreSelect');
+        select.innerHTML = '<option value="">-- Select Store --</option>';
+        
+        data.stores.forEach(store => {
+          const option = document.createElement('option');
+          option.value = store.store_id;
+          option.textContent = store.store_name + ' (' + store.store_code + ') - ' + store.area_name;
+          if (currentStoreId && store.store_id == currentStoreId) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading stores:', error);
+    }
+  }
   </script>
   
   <!-- Select2 JS -->
@@ -800,15 +866,27 @@ $users = $stmt->fetchAll();
   <script>
     // Handle Edit User Modal
     const editUserModal = document.getElementById('editUserModal');
-    editUserModal.addEventListener('show.bs.modal', function (event) {
+    editUserModal.addEventListener('show.bs.modal', async function (event) {
       const button = event.relatedTarget;
       document.getElementById('editUserId').value = button.getAttribute('data-user-id');
       document.getElementById('editEmployeeNumber').value = button.getAttribute('data-user-empnum');
       document.getElementById('editUsername').value = button.getAttribute('data-user-username');
       document.getElementById('editFirstName').value = button.getAttribute('data-user-firstname');
       document.getElementById('editLastName').value = button.getAttribute('data-user-lastname');
+      document.getElementById('editMobileNumber').value = button.getAttribute('data-user-mobile') || '';
       document.getElementById('editDepartment').value = button.getAttribute('data-user-department');
       document.getElementById('editRole').value = button.getAttribute('data-user-role');
+      
+      // Get current area_id and store_id
+      const currentAreaId = button.getAttribute('data-user-area-id');
+      const currentStoreId = button.getAttribute('data-user-store-id');
+      
+      // Load areas and stores
+      await loadEditAreas(currentAreaId);
+      await loadEditStores(currentStoreId);
+      
+      // Show/hide fields based on role
+      toggleEditOrgFields();
     });
 
     // Handle Change Password Modal
@@ -849,12 +927,32 @@ $users = $stmt->fetchAll();
       const lastName = button.getAttribute('data-user-lastname');
       const department = button.getAttribute('data-user-department');
       const role = button.getAttribute('data-user-role');
+      const mobileNumber = button.getAttribute('data-user-mobile');
       
       document.getElementById('detailUsername').textContent = username;
       document.getElementById('detailEmpNum').textContent = empNum;
       document.getElementById('detailFullName').textContent = (firstName + ' ' + lastName).trim() || '-';
       document.getElementById('detailDepartment').textContent = department || '-';
       document.getElementById('detailRole').textContent = role;
+      
+      // Handle mobile number and Viber button
+      const detailMobile = document.getElementById('detailMobile');
+      const viberBtn = document.getElementById('detailViberBtn');
+      
+      if (mobileNumber && mobileNumber !== 'null' && mobileNumber !== '') {
+        detailMobile.textContent = mobileNumber;
+        
+        // Format mobile number for Viber (remove spaces, dashes, etc.)
+        const cleanNumber = mobileNumber.replace(/[\s\-\(\)]/g, '');
+        // If starts with 0, replace with country code (63 for Philippines)
+        const viberNumber = cleanNumber.startsWith('0') ? '+63' + cleanNumber.substring(1) : (cleanNumber.startsWith('+') ? cleanNumber : '+63' + cleanNumber);
+        
+        viberBtn.href = 'viber://chat?number=' + encodeURIComponent(viberNumber);
+        viberBtn.style.display = 'inline-block';
+      } else {
+        detailMobile.textContent = 'Not set';
+        viberBtn.style.display = 'none';
+      }
       
       // Load current equipment and history via AJAX
       loadUserEquipment(userId);

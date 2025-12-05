@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $errors[] = 'Please enter username and password.';
     } else {
-        $stmt = $pdo->prepare('SELECT id, username, password, role FROM users WHERE username = ? LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, username, password, role, area_id, store_id, first_name, last_name FROM users WHERE username = ? LIMIT 1');
         $stmt->execute([$username]);
         $user = $stmt->fetch();
 
@@ -20,7 +20,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user'] = [
                 'id' => $user['id'],
                 'username' => $user['username'],
-                'role' => $user['role']
+                'role' => $user['role'],
+                'area_id' => $user['area_id'],
+                'store_id' => $user['store_id'],
+                'first_name' => $user['first_name'],
+                'last_name' => $user['last_name']
             ];
             header('Location: dashboard.php');
             exit;
@@ -56,30 +60,25 @@ if (isset($_SESSION['user'])) {
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
     body {
-      background: linear-gradient(135deg, #AAC27F 0%, #8BA862 100%);
+      background: url('assets/img/backgound-login.jpg') center/cover no-repeat fixed;
+      position: relative;
       font-family: 'Poppins', sans-serif;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      position: relative;
     }
     
-    /* Animated background particles */
     body::before {
       content: '';
       position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
-      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.05" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,138.7C960,139,1056,117,1152,101.3C1248,85,1344,75,1392,69.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
-      animation: wave 15s ease-in-out infinite;
-      opacity: 0.6;
-    }
-    
-    @keyframes wave {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-20px); }
+      background: rgba(0, 0, 0, 0.3);
+      z-index: 0;
     }
     
     .login-container {
@@ -356,9 +355,11 @@ if (isset($_SESSION['user'])) {
     <div class="login-card">
       <div class="card-header-custom">
         <div class="brand-icon">
-          <i class="fas fa-coffee"></i>
+          <img src="assets/img/UPWhite.png" alt="Pickup Coffee Logo" style="width: 80px; height: auto;">
         </div>
-        <h2 class="brand-title">PICKUP COFFEE</h2>
+        <div style="margin-top: 15px;">
+          <img src="assets/img/PICKUP-Horizontal-White.png" alt="PICKUP COFFEE" style="width: 250px; height: auto;">
+        </div>
         <div class="brand-subtitle">Inventory Management System</div>
       </div>
       

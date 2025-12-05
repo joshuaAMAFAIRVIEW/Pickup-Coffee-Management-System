@@ -54,14 +54,21 @@ if ($status_filter !== '') {
     $params[':status'] = $status_filter;
 }
 
-// Area Manager: Only see items from stores in their area
-if ($user['role'] === 'area_manager' && !empty($user['area_id'])) {
-    $sql .= " AND EXISTS (
-        SELECT 1 FROM store_item_assignments sia
-        INNER JOIN stores s ON sia.store_id = s.store_id
-        WHERE sia.item_id = i.id AND s.area_id = :area_id
-    )";
-    $params[':area_id'] = $user['area_id'];
+// Area Manager: Only see items from stores in their area (that have been received)
+if ($user['role'] === 'area_manager') {
+    if (!empty($user['area_id'])) {
+        $sql .= " AND EXISTS (
+            SELECT 1 FROM store_item_assignments sia
+            INNER JOIN stores s ON sia.store_id = s.store_id
+            WHERE sia.item_id = i.id 
+            AND s.area_id = :area_id
+            AND sia.received_date IS NOT NULL
+        )";
+        $params[':area_id'] = $user['area_id'];
+    } else {
+        // If area manager has no area_id assigned, show no items
+        $sql .= " AND 1 = 0";
+    }
 }
 
 $sql .= " ORDER BY i.created_at DESC";

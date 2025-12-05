@@ -55,11 +55,13 @@ $user = $_SESSION['user'];
         <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
           <a href="activity_logs.php" class="list-group-item list-group-item-action">Activity Logs</a>
         <?php endif; ?>
-        <?php if (isset($user['role']) && in_array($user['role'], ['admin', 'area_manager'])): ?>
+        <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
           <a href="stores.php" class="list-group-item list-group-item-action">Stores</a>
         <?php endif; ?>
+        <?php if (isset($user['role']) && $user['role'] === 'admin'): ?>
+          <a href="release_package.php" class="list-group-item list-group-item-action">Store Release</a>
+        <?php endif; ?>
         <?php if (isset($user['role']) && $user['role'] === 'area_manager'): ?>
-          <a href="manage_team.php" class="list-group-item list-group-item-action">Manage Team</a>
           <a href="area_manager_requests.php" class="list-group-item list-group-item-action">
             Requests
             <?php

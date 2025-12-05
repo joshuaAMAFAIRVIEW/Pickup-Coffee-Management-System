@@ -14,13 +14,14 @@ try {
             s.area_id,
             s.address,
             s.contact_person,
+            s.contact_employee_number,
             s.contact_number,
             s.opening_date,
             s.is_active,
             s.created_at,
             a.area_name,
             COUNT(DISTINCT sia.item_id) as equipment_count,
-            COUNT(DISTINCT u.id) as supervisor_count
+            GROUP_CONCAT(DISTINCT CONCAT(u.first_name, " ", u.last_name) SEPARATOR ", ") as supervisor_names
         FROM stores s
         LEFT JOIN areas a ON s.area_id = a.area_id
         LEFT JOIN store_item_assignments sia ON s.store_id = sia.store_id AND sia.received_date IS NOT NULL

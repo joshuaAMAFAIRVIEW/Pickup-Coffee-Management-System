@@ -48,3 +48,31 @@ function e($value)
 {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
+
+/**
+ * Refresh user session data from database
+ * Call this when you need the latest user data (e.g., after admin updates user)
+ */
+function refresh_user_session()
+{
+    if (!isset($_SESSION['user']['id'])) {
+        return false;
+    }
+    
+    global $pdo;
+    
+    try {
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+        $stmt->execute([$_SESSION['user']['id']]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($user) {
+            $_SESSION['user'] = $user;
+            return true;
+        }
+    } catch (Exception $e) {
+        return false;
+    }
+    
+    return false;
+}

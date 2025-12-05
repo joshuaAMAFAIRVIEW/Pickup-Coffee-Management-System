@@ -59,15 +59,16 @@ try {
         exit;
     }
     
-    // Check if user is a store supervisor
-    if ($user['role'] !== 'store_supervisor') {
+    // Check if user belongs to OPERATION department
+    if (strtolower($user['department']) !== 'operation') {
         echo json_encode([
             'success' => false,
-            'error' => 'This employee is not a store supervisor. Only store supervisors can be assigned to stores.',
-            'error_type' => 'invalid_role',
+            'error' => 'This employee is not in OPERATION department. Only OPERATION employees can be assigned as store supervisors or OIC.',
+            'error_type' => 'invalid_department',
             'user' => [
                 'employee_number' => $user['employee_number'],
                 'name' => trim($user['first_name'] . ' ' . $user['last_name']),
+                'department' => $user['department'],
                 'role' => $user['role']
             ]
         ]);
@@ -79,7 +80,7 @@ try {
     
     echo json_encode([
         'success' => true,
-        'user' => [
+        'employee' => [
             'id' => $user['id'],
             'employee_number' => $user['employee_number'],
             'username' => $user['username'],

@@ -191,13 +191,17 @@ require_once __DIR__ . '/config.php';
             <label class="form-label">Address</label>
             <textarea name="address" id="editStoreAddress" class="form-control" rows="2"></textarea>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label">Contact Person</label>
-            <input type="text" name="contact_person" id="editStoreContactPerson" class="form-control">
+            <input type="text" name="contact_person" id="editStoreContactPerson" class="form-control" maxlength="100">
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
+            <label class="form-label">Employee Number</label>
+            <input type="text" name="contact_employee_number" id="editStoreContactEmployeeNumber" class="form-control" maxlength="50">
+          </div>
+          <div class="col-md-4">
             <label class="form-label">Contact Number</label>
-            <input type="text" name="contact_number" id="editStoreContactNumber" class="form-control">
+            <input type="text" name="contact_number" id="editStoreContactNumber" class="form-control" maxlength="20">
           </div>
           <div class="col-12">
             <div class="form-check">
@@ -208,6 +212,9 @@ require_once __DIR__ . '/config.php';
         </div>
       </div>
       <div class="modal-footer">
+        <button type="button" class="btn btn-success" id="viberContactBtn" style="display: none;" onclick="contactViaViber()">
+          <i class="fab fa-viber"></i> Contact via Viber
+        </button>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="submit" class="btn btn-primary">
           <i class="fas fa-save"></i> Save Changes
@@ -347,6 +354,10 @@ function renderStoresTable(stores) {
       ? '<span class="badge bg-success">Active</span>' 
       : '<span class="badge bg-secondary">Inactive</span>';
     
+    const supervisorDisplay = store.supervisor_names 
+      ? store.supervisor_names 
+      : '<span class="text-muted">Unassigned</span>';
+    
     html += `
       <tr>
         <td><code>${store.store_code}</code></td>
@@ -357,10 +368,12 @@ function renderStoresTable(stores) {
           ${store.contact_number ? '<small class="text-muted">' + store.contact_number + '</small>' : '-'}
         </td>
         <td><span class="badge bg-info">${store.equipment_count} items</span></td>
-        <td><span class="badge bg-secondary">${store.supervisor_count}</span></td>
+        <td>${supervisorDisplay}</td>
         <td>${statusBadge}</td>
         <td>
-          <button class="btn btn-sm btn-outline-primary" onclick="openEditStoreModal(${store.store_id})">
+          <button class="btn btn-sm btn-outline-primary" onclick="openEditStoreModal(${store.store_id})" 
+                  data-store-contact-number="${store.contact_number || ''}"
+                  data-store-contact-person="${store.contact_person || ''}">
             <i class="fas fa-edit"></i>
           </button>
         </td>
@@ -381,14 +394,54 @@ function openEditStoreModal(storeId) {
   document.getElementById('editStoreCode').value = store.store_code;
   document.getElementById('editStoreAddress').value = store.address || '';
   document.getElementById('editStoreContactPerson').value = store.contact_person || '';
+  document.getElementById('editStoreContactEmployeeNumber').value = store.contact_employee_number || '';
   document.getElementById('editStoreContactNumber').value = store.contact_number || '';
   document.getElementById('editStoreOpeningDate').value = store.opening_date || '';
   document.getElementById('editStoreIsActive').checked = store.is_active == 1;
+  
+  // Show/hide Viber button based on contact number
+  const viberBtn = document.getElementById('viberContactBtn');
+  if (store.contact_number && store.contact_number.trim()) {
+    viberBtn.style.display = 'inline-block';
+    viberBtn.setAttribute('data-contact-number', store.contact_number);
+    viberBtn.setAttribute('data-contact-person', store.contact_person || 'Contact Person');
+  } else {
+    viberBtn.style.display = 'none';
+  }
   
   // Populate areas dropdown
   populateAreaDropdown('editStoreArea', store.area_id);
   
   new bootstrap.Modal(document.getElementById('editStoreModal')).show();
+}
+
+function contactViaViber() {
+  const viberBtn = document.getElementById('viberContactBtn');
+  const contactNumber = viberBtn.getAttribute('data-contact-number');
+  const contactPerson = viberBtn.getAttribute('data-contact-person');
+  
+  if (!contactNumber) {
+    alert('No contact number available');
+    return;
+  }
+  
+  // Format number for Viber (remove spaces, dashes, and ensure it starts with +63)
+  let formattedNumber = contactNumber.replace(/[\s\-\(\)]/g, '');
+  
+  // If number starts with 0, replace with +63
+  if (formattedNumber.startsWith('0')) {
+    formattedNumber = '+63' + formattedNumber.substring(1);
+  }
+  // If number doesn't start with +, assume Philippines and add +63
+  else if (!formattedNumber.startsWith('+')) {
+    formattedNumber = '+63' + formattedNumber;
+  }
+  
+  // Create Viber deep link
+  const viberUrl = `viber://chat?number=${encodeURIComponent(formattedNumber)}`;
+  
+  // Open Viber
+  window.location.href = viberUrl;
 }
 
 // ========================================

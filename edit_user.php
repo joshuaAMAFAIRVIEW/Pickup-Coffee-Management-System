@@ -22,6 +22,7 @@ $employee_number = trim($_POST['employee_number'] ?? '');
 $username = trim($_POST['username'] ?? '');
 $first_name = trim($_POST['first_name'] ?? '');
 $last_name = trim($_POST['last_name'] ?? '');
+$mobile_number = trim($_POST['mobile_number'] ?? '');
 $department = trim($_POST['department'] ?? '');
 $role = trim($_POST['role'] ?? '');
 $area_id = !empty($_POST['area_id']) ? (int)$_POST['area_id'] : null;
@@ -111,6 +112,7 @@ try {
         username = ?, 
         first_name = ?, 
         last_name = ?, 
+        mobile_number = ?,
         department = ?, 
         role = ?,
         area_id = ?,
@@ -123,6 +125,7 @@ try {
         $username,
         $first_name,
         $last_name,
+        $mobile_number,
         $department,
         $role,
         $area_id,
